@@ -1,12 +1,15 @@
 import json
 import hashlib
 import os
+import time
 
 os.chdir(__file__.split('src/')[0])
 import sys
 sys.path.append(os.getcwd())
 
 from src.db.database_connection import DatabaseConnection
+from src.util.setup_logging import setup_logging
+logger = setup_logging(__file__)
 
 class CacheLLM(DatabaseConnection):
     def __init__(self, ttl=2592000):  # Default TTL of 30 days
@@ -19,16 +22,19 @@ class CacheLLM(DatabaseConnection):
 
     def get(self, payload):
         """Retrieve an item from the cache."""
+        start_time = time.time()
         key = self._hash(payload)
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT response FROM cache_llm WHERE payload_hash = %(key)s",
                             {'key': key})
                 result = cur.fetchone()
+                logger.debug(f"Checked cache for key: '{key}'. Took {time.time() - start_time:.10f} seconds.")
                 return result['response'] if result else None
 
     def set(self, payload, headers, response):
         """Store an item in the cache."""
+        start_time = time.time()
         key = self._hash(payload)
         env = headers.get('env')
         latency = headers.get('latency')
@@ -57,6 +63,8 @@ class CacheLLM(DatabaseConnection):
                     }
                 )
                 conn.commit()
+        logger.debug(f"Saved response in cache for key: {key}. Took {time.time() - start_time:.10f} seconds.")
+
 
     def delete(self, payload):
         """Delete an item from the cache."""
