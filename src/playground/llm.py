@@ -18,9 +18,8 @@ skill = Completion(
     ('Test', 'Excuse')
 )
 
-
 result = skill.complete(
-    prompt_inputs={"event": "party"}
+    prompt_inputs={"event": "party3"}
 )
 result
 # %%

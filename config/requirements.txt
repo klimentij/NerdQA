@@ -1,3 +1,4 @@
 litellm[proxy]
 prisma
 ipykernel
+psycopg[binary,pool]

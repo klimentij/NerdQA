@@ -7,6 +7,7 @@ from typing import Union, List, Dict, Optional
 
 from src.llm.response import Response
 from src.util.env_util import cfg, litellm_cfg
+from src.db.cache_llm import CacheLLM
 
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__)
@@ -15,16 +16,14 @@ class LiteLLMProxyWrapper:
     def __init__(
             self,
             caching: bool = False,
-            cache_ttl: int = 60 * 60 * 24 * 30,
             stream: bool = False,
     ):
         self.headers = {"Authorization": f"Bearer {litellm_cfg['general_settings']['master_key']}", "Content-Type": "application/json"}
         self.caching = caching  # Enable or disable caching
-        self.cache_ttl = cache_ttl  # Time-to-live for cache entries
         self.stream = stream
         
         # init cache
-        # self.cache = CacheLLMCollection(db_name=db, collection_name=cfg['mongo']['collections']['cache_llm'], ttl=self.cache_ttl)
+        self.cache = CacheLLM()
 
     def completion(self, model: str, messages: List[Dict], mock: bool = False, current_cost: float = 0., prefill: str = None, **kwargs):
             
@@ -85,8 +84,9 @@ class LiteLLMProxyWrapper:
 
         if self.caching:
             logger.info("Caching response")
-            thread = Thread(target=self._update_cache, args=(payload, result), kwargs={'latency': latency})
-            thread.start()
+            # thread = Thread(target=self._update_cache, args=(payload, result), kwargs={'latency': latency})
+            # thread.start()
+            self._update_cache(payload, result, latency=latency)
 
         return result
         
@@ -109,11 +109,10 @@ class LiteLLMProxyWrapper:
         return result
 
 
-    def _update_cache(self, payload, result, latency=None, generation_stopped=False):
+    def _update_cache(self, payload, result, latency=None):
         cost = Response(result).cost if result else 0
         meta = {
             "cost": cost,
-            "generation_stopped": generation_stopped,
             **self.headers,
         }
         if latency is not None:

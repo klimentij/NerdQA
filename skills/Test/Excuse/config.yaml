@@ -1,4 +1,4 @@
-caching: false
+caching: true
 
 completion_kwargs:
   model: llama3-70b-8192
