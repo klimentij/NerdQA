@@ -1,9 +1,10 @@
 model_list:
-  - model_name: groq/llama3-70b-8192 ### RECEIVED MODEL NAME ###
+  - model_name: llama3-70b-8192 ### RECEIVED MODEL NAME ###
     litellm_params: # all params accepted by litellm.completion() - https://docs.litellm.ai/docs/completion/input
       model: groq/llama3-70b-8192 ### MODEL NAME sent to `litellm.completion()` ###
       api_key: "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" # does os.getenv("AZURE_API_KEY_EU")
       rpm: 6      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
+      llm_context_length: 8192
 
 general_settings: 
   master_key: "sk-ade-myreallystrongmasterkeyhahah4359rt8guifhj" # [OPTIONAL] Only use this if you to require all calls to contain this key (Authorization: Bearer sk-1234)

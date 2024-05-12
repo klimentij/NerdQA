@@ -1,41 +1,20 @@
 import logging
 import os
-import json_log_formatter
 import threading
 import time
-
 from logging.handlers import TimedRotatingFileHandler
-from dotenv import load_dotenv
 
-_global_json_handler = None
 _global_text_handler = None
 _handler_lock = threading.Lock()
-
-os.chdir(__file__.split('src/')[0])
-import sys
-
-sys.path.append(os.getcwd())
 
 # read yml config file (can't read from util due to circular import)
 import yaml
 
-cfg_path = os.path.join(os.getcwd(), 'configs', 'config.yml')
-with open(cfg_path, 'r') as f:
-    cfg = yaml.load(f, Loader=yaml.FullLoader)
-load_dotenv(cfg['import']['folders']['env'])
+os.chdir(__file__.split('src/')[0])
+import sys
+sys.path.append(os.getcwd())
 
-# detect Slack bot type (env name) from Slack bot credentials
-env_name = "unknown"
-sb_token = os.environ.get('SLACK_BOT_TOKEN', "")
-if "XgoQrfldwYtW" in sb_token:
-    env_name = "dev"
-elif "MhXodGgM07kFWTWR" in sb_token:
-    env_name = "exp"
-elif "Y28CpxFQZif" in sb_token:
-    env_name = "prod"
-else:
-    logging.warning(f"Could not detect Slack bot type (env name) from Slack bot credentials, using default: {env_name}")
-
+from src.util.env_util import cfg
 
 # Custom LogRecord class
 class CustomLogRecord(logging.LogRecord):
@@ -51,7 +30,7 @@ def custom_record_factory(*args, **kwargs):
     return CustomLogRecord(*args, **kwargs)
 
 
-def setup_logging(script_path, log_level=logging.INFO):
+def setup_logging(script_path, log_level=os.environ.get('LOG_LEVEL', logging.INFO)):
     """
     Setup Logger instances.
     """
@@ -63,7 +42,6 @@ def setup_logging(script_path, log_level=logging.INFO):
     logger.propagate = False  # Stop propagation to avoid duplicate logs
 
     # Set Global Handlers
-    global _global_json_handler
     global _global_text_handler
 
     # Stream Handler for console logging
@@ -74,20 +52,11 @@ def setup_logging(script_path, log_level=logging.INFO):
 
     # set up _global_json_handler if not yet and add to loggers
     with _handler_lock:
-        if _global_json_handler is None:
-            alpha_log_file_path = cfg['datadog']['alpha_log_file_path']
-            _global_json_handler = ChunkedTimeRotatingFileHandler(alpha_log_file_path, when='midnight', interval=1, backupCount=7)
-            _global_json_handler.setFormatter(CustomizedJSONFormatter())
-            _global_json_handler.setLevel(logging.DEBUG)
-
         if _global_text_handler is None:
-            text_log_file_path = os.path.join(cfg['general']['folders']['logs'], 'alpha.log')
+            text_log_file_path = os.path.join(cfg['paths']['logs'], 'main.log')
             _global_text_handler = ChunkedTimeRotatingFileHandler(text_log_file_path, when='midnight', interval=1, backupCount=7)
             _global_text_handler.setFormatter(CustomizedTextFormatter())
             _global_text_handler.setLevel(logging.DEBUG)
-
-    if _global_json_handler not in logger.handlers:
-        logger.addHandler(_global_json_handler)
 
     if _global_text_handler not in logger.handlers:
         logger.addHandler(_global_text_handler)
@@ -140,37 +109,6 @@ class ChunkedTimeRotatingFileHandler(TimedRotatingFileHandler):
             self.handleError(chunk)
 
 
-class CustomizedJSONFormatter(json_log_formatter.JSONFormatter):
-    """
-        Formats log with desired attributes and json format
-    """
-
-    def __init__(self, timestamp=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.timestamp = timestamp
-
-    def json_record(self, message: str, extra: dict, record: logging.LogRecord) -> dict:
-
-        # Call parent
-        log_output = super().json_record(message, extra, record)
-
-        # Add time stamp when log was created
-        if self.timestamp:
-            log_output['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(record.created))
-
-        # Append logger path information
-        dir_path, file_name = os.path.split(record.pathname)
-        last_folder = os.path.basename(dir_path)
-        log_output['Log_call_path'] = os.path.join(last_folder, file_name)
-
-        log_output['level'] = record.levelname
-
-        # Add the 'environment' variable to the JSON data
-        log_output['env'] = env_name
-
-        return log_output
-
-
 class CustomizedTextFormatter(logging.Formatter):
     """
         Formats log with desired attributes and text format
@@ -182,7 +120,7 @@ class CustomizedTextFormatter(logging.Formatter):
             # Format additional attributes
             attributes = {
                 "path": os.path.join(os.path.basename(os.path.dirname(record.pathname)), os.path.basename(record.pathname)),
-                "env": env_name,
+                "env": os.environ.get('ENV_NAME', "dev"),
                 "user_id": getattr(record, 'user_id', None),
                 "turn_id": getattr(record, 'turn_id', None),
                 "channel_id": getattr(record, 'channel_id', None)

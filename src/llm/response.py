@@ -1,12 +1,8 @@
 import json
-
-import litellm
-
-from src.utils.kb_utils import turns_collection
-
 import logging
-from src.utils.setup_logging import setup_logging
-logger = setup_logging(__file__, logging.DEBUG)
+from src.util.setup_logging import setup_logging
+logger = setup_logging(__file__)
+
 class Response:
     def __init__(self, response: dict, prompt: str = '', indexed_turn_id: str = None, indexed_turn_ts=None,
                  observability_tool_properties: dict = None):
@@ -32,7 +28,7 @@ class Response:
         if response.get('from_cache'):
             self.cost = 0
         else:
-            self.cost = self._get_cost()
+            self.cost = 0 #self._get_cost()
 
         if response.get('choices', [])[0].get('message', {}).get('tool_calls', []):
             # and response.get('choices', [])[0].get('finish_reason') == 'tool_calls':
@@ -93,7 +89,6 @@ class Response:
                 if self.tool_calls:
                     message['tool_calls'] = self.tool_calls
 
-                turns_collection.update_single_message(self.indexed_turn_id, message)
                 logger.debug(f"Updated message in DB with id: {self.indexed_turn_id}")
             except:
                 logger.exception(f"Failed to update message in DB with id: {self.indexed_turn_id}")

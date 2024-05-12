@@ -1,0 +1,7 @@
+api:
+  llm:
+    base: http://0.0.0.0:4000
+paths:
+  env: config/.env
+  logs: logs
+  skills: skills
