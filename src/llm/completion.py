@@ -50,7 +50,6 @@ class Completion:
                  completion_kwargs: Optional[Dict] = None,
                  tools: Optional[List[Dict]] = None,
                  all_skills_path: Optional[str] = cfg['paths']['skills'],
-                 api_base: str = cfg['observability_tool']['api_base'],
                  trim: Optional[List[Trim]] = None,
                  trim_just_in_case_tokens: Optional[int] = 100,
                  channel_id: Optional[str] = None,
@@ -87,7 +86,6 @@ class Completion:
         self.completion_kwargs = completion_kwargs
         self.tools = tools
         self.all_skills_path = all_skills_path
-        self.api_base = api_base
         self.trim = trim
         self.trim_just_in_case_tokens = trim_just_in_case_tokens
         self.channel_id = channel_id
@@ -186,13 +184,9 @@ class Completion:
 
         try:
             self.completion_kwargs.update(self.skill_config.get("completion_kwargs", {}))
-            self.observability_tool_kwargs.update(self.skill_config.get("observability_tool_kwargs", {}))
-            self.observability_tool_properties.update(self.skill_config.get("observability_tool_properties", {}))
         except:
             logger.exception(f"Failed to update completion_kwargs, observability_tool_kwargs, observability_tool_properties from skill config")
 
-
-        self.observability_tool_properties["Skill"] = "_".join(skill)
 
         self.litellm_model_config = [m for m in litellm_cfg['model_list'] if m['model_name'] == self.completion_kwargs['model']][0]
         self.llm_context_length = self.litellm_model_config.get("context_length", 8192)
@@ -350,15 +344,6 @@ class Completion:
             logger.error(error_message)
             raise ValueError(error_message)
         
-        # some inputs can be logger as properties in observability tool
-        # override/add observability_tool_properties from inputs using self.observability_tool_inputs_as_properties
-        if self.observability_tool_inputs_as_properties:
-            for k in self.observability_tool_inputs_as_properties:
-                if k in single_input:
-                    self.observability_tool_properties[k] = single_input[k]
-            self._set_headers()
-            
-
         return self._parse_messages(prompt)
     
     def _parse_messages(self, prompt: str) -> List[Dict]:
@@ -394,7 +379,6 @@ class Completion:
             self, 
             prompt_inputs: Optional[Union[Dict, List[Dict]]] = None, 
             messages: Optional[List[Dict]] = None, # non-batch only!
-            observability_tool_properties: Optional[Dict] = None,
             doc_placeholders = False,
             mock: bool = False, 
             ) -> Union[Response, List[Response]]:
@@ -404,26 +388,6 @@ class Completion:
 
         if doc_placeholders:
             self.doc_placeholders = doc_placeholders
-
-        if observability_tool_properties is None:
-            observability_tool_properties = {}
-
-        # override/add observability_tool_properties using observability_tool_properties variable
-        if observability_tool_properties:
-            self.observability_tool_properties.update(observability_tool_properties)
-
-        if 'user_id' in self.observability_tool_properties:
-            logger.user_id = self.observability_tool_properties['user_id']
-        
-        if 'channel_id' in self.observability_tool_properties:
-            logger.turn_id = self.observability_tool_properties['channel_id']
-
-        if 'turn_id' in self.observability_tool_properties:
-            turn_id = self.observability_tool_properties['turn_id']
-            logger.turn_id = turn_id
-        
-        # set headers again to update observability_tool_properties between calls
-        self._set_headers()
 
         # reset messages (history is kept in DB)
         self.messages = []
@@ -478,8 +442,6 @@ class Completion:
                 return self.complete(
                     prompt_inputs=prompt_inputs,
                     messages=[{'role': 'system', 'content': 'You forgot to add tool call(s), fix!'}],
-                    observability_tool_properties=observability_tool_properties,
-                    mock=mock,
                     )
             
             last_indexed_turn_id = None
@@ -490,12 +452,12 @@ class Completion:
 
             return Response(response, prompt=json.dumps(self.messages, indent=2),
                             indexed_turn_id=last_indexed_turn_id, indexed_turn_ts=last_indexed_turn_ts,
-                            observability_tool_properties=observability_tool_properties)
+                            )
 
         elif type(self.messages[0]) == list and type(self.messages[0][0]) == dict:
             # we don't track thread for batch completions
             return [Response(r, prompt=json.dumps(self.messages, indent=2),
-                             observability_tool_properties=observability_tool_properties) for r in response]
+                             ) for r in response]
 
         else:
             error_message = f"Invalid type for 'messages'. Must be either a list of dicts or a list of lists of dicts. Got {type(self.messages)}"

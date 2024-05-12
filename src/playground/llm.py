@@ -17,3 +17,5 @@ logger = setup_logging(__file__)
 skill = Completion(
     ('Test', 'Excuse')
 )
+
+# %%
