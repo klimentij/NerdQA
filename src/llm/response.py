@@ -25,6 +25,9 @@ class Response:
 
         # Set the cost of the response
         # Cached are free
+        print(type(response))
+        print(response)
+
         if response.get('from_cache'):
             self.cost = 0
         else:

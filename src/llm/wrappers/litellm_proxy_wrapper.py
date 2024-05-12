@@ -42,9 +42,6 @@ class LiteLLMProxyWrapper:
                     logger.warning(f"Failed to convert message content to string. Trying with str()")
                     message['content'] = str(message['content'])
 
-        # remove stopped by user information
-        messages = list(map(lambda d: {k: v for k, v in d.items() if k != 'generation_stopped'} , messages))
-    
 
         payload = {
             "model": model,
@@ -78,8 +75,6 @@ class LiteLLMProxyWrapper:
         # Calculate and store latency for the single request
         latency = end_time - start_time
         logger.debug(f"API request took {latency} seconds")
-        self._update_latency_and_timeout([latency])
-
         result = response.json()
 
         # inject prefilled content into the result
@@ -109,6 +104,7 @@ class LiteLLMProxyWrapper:
         }
         data.update(kwargs)
 
+        logger.debug(f"Making API request to {url}. \n\nData: {json.dumps(data, indent=2)}")
         result = requests.post(url, headers=headers, json=data)
         return result
 

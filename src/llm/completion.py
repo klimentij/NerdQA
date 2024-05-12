@@ -109,10 +109,7 @@ class Completion:
         self._load_skill(self.skill)
 
         self.llm = LiteLLMProxyWrapper(
-                initial_timeout=self.initial_timeout,
-                num_retries=self.num_retries,
-                caching=self.caching,
-                stream=self.stream
+                caching=self.caching
                 )
         
         self._set_headers()
@@ -186,7 +183,6 @@ class Completion:
             self.completion_kwargs.update(self.skill_config.get("completion_kwargs", {}))
         except:
             logger.exception(f"Failed to update completion_kwargs, observability_tool_kwargs, observability_tool_properties from skill config")
-
 
         self.litellm_model_config = [m for m in litellm_cfg['model_list'] if m['model_name'] == self.completion_kwargs['model']][0]
         self.llm_context_length = self.litellm_model_config.get("context_length", 8192)
@@ -413,13 +409,9 @@ class Completion:
         if self.prefill:
             self.messages.append({'role': 'assistant', 'content': self.prefill})
 
-        # heal messages
-        # logger.debug(f"Messages before healing: {json.dumps(self.messages, indent=2)}")
-        self.messages = self.heal_messages(self.messages)
-        # logger.debug(f"Messages after healing: {json.dumps(self.messages, indent=2)}")
 
         response = self.llm.completion(
-            messages=self.messages, mock=mock, current_cost=self.current_cost, prefill=self.prefill, **self.completion_kwargs)
+            messages=self.messages, prefill=self.prefill, **self.completion_kwargs)
         logger.debug(f"Response from self.llm.completion: {response}")
 
         if type(self.messages[0]) == dict:

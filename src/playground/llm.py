@@ -13,9 +13,16 @@ from src.util.env_util import cfg, litellm_cfg
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__)
 
-#%%
+
 skill = Completion(
     ('Test', 'Excuse')
 )
 
+
+result = skill.complete(
+    prompt_inputs={"event": "party"}
+)
+result
 # %%
+# %%
+
