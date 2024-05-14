@@ -78,8 +78,8 @@ class BraveSearchClient:
             logger.error(f"Request failed: {e}")
             raise
 
-# Usage example:
-if __name__ == "__main__":
-    brave_search = BraveSearchClient()
-    results = brave_search.search("What are the ethical  implications and potential mitigation strategies for bias in large language models, especially considering their impact on shaping public discourse and personal decision-making? site:arxiv.org OR site:ieee.org OR site:pubmed.gov OR site:acm.org")
-    # logger.info(f"Search results: \n\n{json.dumps(results, indent=2)}")
+
+# brave_search = BraveSearchClient()
+# results = brave_search.search("Can the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approaches?") # site:semanticscholar.org")
+# logger.info(f"Search results: \n\n{json.dumps(results, indent=2, sort_keys=False)}")
+

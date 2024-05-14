@@ -1,0 +1,13 @@
+caching: true
+
+completion_kwargs:
+  model: llama3-70b-8192
+  temperature: 0.5
+  max_tokens: 500
+  stop: ['</subquestions>']
+
+trims:
+  - name: 'SEARCH_RESULTS'
+    trim_type: 'END'
+    min_length: 3000
+    max_length: 6000

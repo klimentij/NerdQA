@@ -16,7 +16,7 @@ from src.util.env_util import cfg, litellm_cfg
 
 # Set up logger
 from src.util.setup_logging import setup_logging
-logger = setup_logging(__file__)
+logger = setup_logging(__file__, "INFO")
 
 
 class Completion:
@@ -241,7 +241,7 @@ class Completion:
                         prompt = prompt.replace(placeholder, str(v))
                     
                 messages = self._parse_messages(prompt)
-                total_tokens = self.tokenizer.encode(str(messages)) \
+                total_tokens = len(self.tokenizer.encode(str(messages))) \
                     + self.trim_just_in_case_tokens \
                     + self.completion_kwargs['max_tokens']
                 

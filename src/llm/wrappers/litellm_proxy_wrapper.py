@@ -10,7 +10,7 @@ from src.util.env_util import cfg, litellm_cfg
 from src.db.cache_llm import CacheLLM
 
 from src.util.setup_logging import setup_logging
-logger = setup_logging(__file__)
+logger = setup_logging(__file__, 'INFO')
 
 class LiteLLMProxyWrapper:
     def __init__(
@@ -56,7 +56,7 @@ class LiteLLMProxyWrapper:
                     response['from_cache'] = True
                     return response
                 else:
-                    logger.debug(f"Response not found in cache, making API request. Timeout: {round(self.timeout, 2)}")
+                    logger.debug(f"Response not found in cache, making API request")
 
         except Exception:
             logger.exception("Failed caching")

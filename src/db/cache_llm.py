@@ -24,6 +24,7 @@ class CacheLLM(DatabaseConnection):
         """Retrieve an item from the cache."""
         start_time = time.time()
         key = self._hash(payload)
+        start_time = time.time()
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT response FROM cache_llm WHERE payload_hash = %(key)s",
