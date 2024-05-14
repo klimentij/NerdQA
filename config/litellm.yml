@@ -2,9 +2,20 @@ model_list:
   - model_name: llama3-70b-8192 ### RECEIVED MODEL NAME ###
     litellm_params: # all params accepted by litellm.completion() - https://docs.litellm.ai/docs/completion/input
       model: groq/llama3-70b-8192 ### MODEL NAME sent to `litellm.completion()` ###
-      api_key: "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" # does os.getenv("AZURE_API_KEY_EU")
+      api_key: "os.environ/GROQ_API_KEY"
+      rpm: 6      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
+  - model_name: claude-3-haiku-20240307 ### RECEIVED MODEL NAME ###
+    litellm_params: # all params accepted by litellm.completion() - https://docs.litellm.ai/docs/completion/input
+      model: anthropic/claude-3-haiku-20240307 ### MODEL NAME sent to `litellm.completion()` ###
+      api_key: "os.environ/ANTHROPIC_API_KEY" # does os.getenv
       rpm: 6      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
       
+litellm_settings:
+  num_retries: 3 # retry call 3 times on each model_name (e.g. zephyr-beta)
+  request_timeout: 100 # raise Timeout error if call takes longer than 10s. Sets litellm.request_timeout 
+  fallbacks: [{"llama3-70b-8192": ["claude-3-haiku-20240307"]}] # fallback to if call fails num_retries 
+  allowed_fails: 3 # cooldown model if it fails > 1 call in a minute. 
+
 general_settings: 
   master_key: "sk-ade-myreallystrongmasterkeyhahah4359rt8guifhj" # [OPTIONAL] Only use this if you to require all calls to contain this key (Authorization: Bearer sk-1234)
   database_url: "postgresql://klim:mypasswordlongnicepwd32rf23r9fu@localhost/litellm"

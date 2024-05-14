@@ -42,7 +42,7 @@ class BraveSearchClient:
             **kwargs: Optional parameters to override default search parameters.
 
         Returns:
-            dict: The search results.
+            dict: The filtered search results.
         """
         start_time = time.time()
         params = self.default_params.copy()
@@ -54,23 +54,19 @@ class BraveSearchClient:
         if cached_response:
             latency = time.time() - start_time
             logger.debug(f"Cache hit for query: {query}. Retrieved in {latency:.10f} seconds.")
-            return cached_response
+            return self._filter_results(cached_response)
 
-        
         try:
             logger.debug(f"Sending search request to Brave API: {params}")
             response = self.session.get(self.base_url, headers=self.headers, params=params)
             response.raise_for_status()
 
             # Store response in cache
-            meta = {}
             latency = time.time() - start_time
             logger.debug(f"Received response in {latency:.4f} seconds")
-            meta['latency'] = latency
-            meta.update(self.headers)
             self.cache.set(params, self.headers, response.json())
 
-            return response.json()
+            return self._filter_results(response.json())
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTPError during search: {e}")
             raise
@@ -78,8 +74,22 @@ class BraveSearchClient:
             logger.error(f"Request failed: {e}")
             raise
 
+    def _filter_results(self, response):
+        """
+        Filter the search results to include only specified keys.
 
+        Parameters:
+            response (dict): The raw search results.
+
+        Returns:
+            dict: The filtered search results.
+        """
+        keys_to_keep = ['title', 'page_age', 'description', 'extra_snippets']
+        results = response.get('web', {}).get('results', [])
+        filtered_results = [{key: result[key] for key in keys_to_keep if key in result} for result in results]
+        return {'web': {'results': filtered_results}}
+
+# Example usage
 # brave_search = BraveSearchClient()
-# results = brave_search.search("Can the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approaches?") # site:semanticscholar.org")
+# results = brave_search.search("Can the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approaches?")
 # logger.info(f"Search results: \n\n{json.dumps(results, indent=2, sort_keys=False)}")
-
