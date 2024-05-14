@@ -1,34 +1,41 @@
-You will be generating subquestions to help research and answer a complex original question.
+You are working on a complex problem that requires breaking it down into smaller, more manageable questions. To assist in this process, you have provided the following information:
 
-Here is the original question:
 <original_question>
 {{$ORIGINAL_QUESTION}}
 </original_question>
 
-And here are the search results returned so far for that question:
-<search_results>
+<subquestion_tree>
+{{$SUBQUESTION_TREE}}
+</subquestion_tree>
+
+<current_subquestion>
+{{$CURRENT_SUBQUESTION}}
+</current_subquestion>
+
+<current_subquestion_search_results>
 {{$SEARCH_RESULTS}}
-</search_results>
+</current_subquestion_search_results>
 
-First, carefully analyze the original question and the provided search results. Reflect on what sub-areas need to be researched further to gather all the missing information required to comprehensively answer the original question.
+Your task is to analyze the current subquestion, reflect on the search results, and generate a set of focused subquestions (queries) to delve deeper into the topic and find the missing information needed to answer the original question comprehensively.
 
-Provide your reflection in one paragraph, considering the following:
-1. The main topic of the original question
-2. Key aspects and sub-topics related to the main topic
-3. Additional information needed to thoroughly address the question
-4. Gaps in knowledge not covered by the provided search results
-5. How to phrase the subquestions as effective search queries
+<reflection>
+Take a moment to analyze the original question, the subquestion tree, and the current subquestion. Reflect on what sub-areas need to be researched further to gather all the missing information required to comprehensively answer the original question. Consider the main topic, key aspects, sub-topics, additional information needed, and how to phrase the queries as effective search queries. Provide your reflection in a single paragraph.
+</reflection>
 
-Write your reflection inside <reflection> tags. It should be a single paragraph of very compressed and concise text.
+<query_generation>
+Generate between 1 and {{$NUM_QUERIES}} queries that break down the current subquestion into more focused parts. These queries should be optimized for effective Google searches to research the key aspects and nuances of the original question. Each query should be standalone, containing all the necessary context within itself to be meaningful and effective. Use Google search operators to make the queries more targeted and efficient. Avoid duplicating information that might already be covered in the search results of other subquestions.
 
-Next, generate {{$NUM_SUBQUESTIONS}} subquestions that break down the original question into more focused queries. These subquestions should be used to research the key aspects and nuances of the original question using a search engine like Google.
-
-Format the subquestions like this:
-<subquestions>
-<subquestion>Subquestion 1</subquestion>
-<subquestion>Subquestion 2</subquestion>
+Format your generated queries as follows:
+<queries>
+<query>query 1</query>
+<query>query 2</query>
 ...
-<subquestion>Subquestion {{$NUM_SUBQUESTIONS}}</subquestion>
-</subquestions>
+<query>query n</query>
+</queries>
+</query_generation>
 
-The subquestions you generate will be used as Google search queries by a small language model to collect the missing information needed to thoroughly address the original question.
+<output_format>
+Please provide your output in the following format:
+1. A paragraph containing your reflection on the original question, subquestion tree, current subquestion and search results to identify the key areas that need further research.
+2. The generated queries, formatted as specified above.
+</output_format>

@@ -27,27 +27,28 @@ class MarkdownRenderer(Renderer):
     def __init__(self, filepath: str):
         self.filepath = filepath
         with open(self.filepath, 'w') as f:
-            f.write("# Subquestions\n\n")
+            f.write("# Queries\n\n")
 
     def render(self, content: str):
         with open(self.filepath, 'a') as f:
             f.write(content + '\n')
 
-class SubQuestionGenerator:
-    def __init__(self, renderer: Renderer, num_subquestions: int = 3, depth: int = 3):
-        self.num_subquestions = num_subquestions
+class QueryGenerator:
+    def __init__(self, renderer: Renderer, num_queries: int = 3, depth: int = 3):
+        self.num_queries = num_queries
         self.depth = depth
         self.web_search = BraveSearchClient()
         self.skill = Completion(('Forward', 'SubQuestions'))
-        self.total_questions_generated = 0
+        self.total_queries_generated = 0
         self.renderer = renderer
         self.requests_sent_to_search = 0
         self.requests_sent_to_llm = 0
         self.cache_retrievals = 0
         self.total_steps = 0
+        self.query_tree = {}
 
-    def generate_subquestions(self, question: str) -> str:
-        logger.debug(f"Generating subquestions for: {question}")
+    def generate_queries(self, question: str, query_tree: dict, current_query: str) -> str:
+        logger.debug(f"Generating queries for: {question}")
         self.requests_sent_to_search += 1
         search_results = self.web_search.search(question)
         logger.debug(f"Search returned {len(search_results.get('web', {}).get('results', []))} results")
@@ -57,42 +58,45 @@ class SubQuestionGenerator:
             prompt_inputs={
                 "ORIGINAL_QUESTION": question,
                 "SEARCH_RESULTS": str(search_results),
-                "NUM_SUBQUESTIONS": str(self.num_subquestions)
+                "SUBQUESTION_TREE": json.dumps(query_tree),
+                "CURRENT_SUBQUESTION": current_query,
+                "NUM_QUERIES": str(self.num_queries)
             }
         )
-        logger.debug(f"Subquestions result: {result.content}")
+        logger.debug(f"Queries result: {result.content}")
         return result.content
 
     @staticmethod
-    def parse_subquestions(text: str) -> List[str]:
+    def parse_queries(text: str) -> List[str]:
         pattern = re.compile(r'<subquestion>(.*?)<\/subquestion>', re.DOTALL)
-        subquestions = pattern.findall(text)
-        logger.debug(f"Parsed subquestions: {subquestions}")
-        return subquestions
+        queries = pattern.findall(text)
+        logger.debug(f"Parsed queries: {queries}")
+        return queries
 
-    def build_subquestion_list(self, question: str, current_depth: int = 0):
-        logger.debug(f"Building subquestion list for: {question} at depth {current_depth}")
+    def build_query_list(self, question: str, current_depth: int = 0):
+        logger.debug(f"Building query list for: {question} at depth {current_depth}")
         if current_depth >= self.depth:
             return
 
-        subquestions_text = self.generate_subquestions(question)
-        subquestions = self.parse_subquestions(subquestions_text)
-        self.total_questions_generated += 1
-        self.total_steps += len(subquestions) + 1
+        queries_text = self.generate_queries(question, self.query_tree, question)
+        queries = self.parse_queries(queries_text)
+        self.total_queries_generated += 1
+        self.total_steps += len(queries) + 1
 
         self.renderer.render(f"{'    ' * current_depth}- {question}")
 
-        for subquestion in subquestions:
-            self.build_subquestion_list(subquestion, current_depth + 1)
+        self.query_tree[question] = queries
+        for query in queries:
+            self.build_query_list(query, current_depth + 1)
             self.total_steps += 1
 
     def save_to_markdown(self, initial_question: str):
         start_time = time.time()
-        with tqdm(total=self.num_subquestions ** self.depth, desc="Generating Subquestions") as pbar:
-            self.build_subquestion_list(initial_question)
+        with tqdm(total=self.num_queries ** self.depth, desc="Generating Queries") as pbar:
+            self.build_query_list(initial_question)
             pbar.update(self.total_steps)
         elapsed_time = time.time() - start_time
-        logger.debug(f"Total questions generated: {self.total_questions_generated}")
+        logger.debug(f"Total queries generated: {self.total_queries_generated}")
         logger.debug(f"Requests sent to search: {self.requests_sent_to_search}")
         logger.debug(f"Requests sent to LLM: {self.requests_sent_to_llm}")
         logger.debug(f"Cache retrievals: {self.cache_retrievals}")
@@ -110,7 +114,7 @@ if __name__ == "__main__":
     output_path = os.path.join(output_folder, output_filename)
 
     renderer = MarkdownRenderer(output_path)
-    generator = SubQuestionGenerator(renderer, num_subquestions=1, depth=10)
+    generator = QueryGenerator(renderer, num_queries=1, depth=10)
     generator.save_to_markdown(initial_question)
 
-    print(f"Subquestions saved to {output_path}")
+    print(f"Queries saved to {output_path}")

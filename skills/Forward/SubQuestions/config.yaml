@@ -10,4 +10,19 @@ trims:
   - name: 'SEARCH_RESULTS'
     trim_type: 'END'
     min_length: 3000
-    max_length: 6000
+    max_length: 4000
+
+  - name: 'SUBQUESTION_TREE'
+    trim_type: 'END'
+    min_length: 100
+    max_length: 1000
+
+  - name: 'ORIGINAL_QUESTION'
+    trim_type: 'END'
+    min_length: 100
+    max_length: 500
+
+  - name: 'CURRENT_SUBQUESTION'
+    trim_type: 'END'
+    min_length: 100
+    max_length: 500
