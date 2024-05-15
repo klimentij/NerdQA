@@ -46,65 +46,79 @@ class QueryGenerator:
         self.cache_retrievals = 0
         self.total_steps = 0
         self.query_tree = {}
+        self.initial_question = None
 
-    def generate_queries(self, question: str, query_tree: dict, current_query: str) -> str:
-        logger.debug(f"Generating queries for: {question}")
+    def generate_queries(self, current_query: str, query_subtree: dict) -> str:
+        logger.debug(f"Generating queries for: {current_query}")
         self.requests_sent_to_search += 1
-        search_results = self.web_search.search(question)
+        search_results = self.web_search.search(current_query)
         logger.debug(f"Search returned {len(search_results.get('web', {}).get('results', []))} results")
 
         self.requests_sent_to_llm += 1
         result = self.skill.complete(
             prompt_inputs={
-                "ORIGINAL_QUESTION": question,
-                "SEARCH_RESULTS": str(search_results),
-                "SUBQUESTION_TREE": json.dumps(query_tree),
+                "ORIGINAL_QUESTION": self.initial_question,
+                "SUBQUESTION_TREE": json.dumps(self.query_tree),
                 "CURRENT_SUBQUESTION": current_query,
+                "SEARCH_RESULTS": json.dumps(search_results),
                 "NUM_QUERIES": str(self.num_queries)
             }
         )
         logger.debug(f"Queries result: {result.content}")
         return result.content
 
-    @staticmethod
-    def parse_queries(text: str) -> List[str]:
-        pattern = re.compile(r'<subquestion>(.*?)<\/subquestion>', re.DOTALL)
+    def parse_queries(self, text: str) -> List[str]:
+        pattern = re.compile(r'<query>(.*?)<\/query>', re.DOTALL)
         queries = pattern.findall(text)
         logger.debug(f"Parsed queries: {queries}")
+        if len(queries) == 0:
+            logger.warning("No queries found")
+            return []
+        queries = [query.strip() for query in queries][:self.num_queries]
         return queries
 
-    def build_query_list(self, question: str, current_depth: int = 0):
+    def build_query_list(self, question: str, query_subtree: dict, current_depth: int = 0, pbar=None):
         logger.debug(f"Building query list for: {question} at depth {current_depth}")
         if current_depth >= self.depth:
+            self.renderer.render(f"{'    ' * current_depth}- {question}")
+            if pbar:
+                pbar.update(1)
             return
 
-        queries_text = self.generate_queries(question, self.query_tree, question)
+        queries_text = self.generate_queries(question, query_subtree)
         queries = self.parse_queries(queries_text)
         self.total_queries_generated += 1
         self.total_steps += len(queries) + 1
 
         self.renderer.render(f"{'    ' * current_depth}- {question}")
 
-        self.query_tree[question] = queries
+        query_subtree[question] = {}
         for query in queries:
-            self.build_query_list(query, current_depth + 1)
+            query_subtree[question][query] = {}
+            self.build_query_list(query, query_subtree[question], current_depth + 1, pbar)
+            if pbar:
+                pbar.update(1)
             self.total_steps += 1
 
     def save_to_markdown(self, initial_question: str):
+        self.initial_question = initial_question  # Set the initial question here
         start_time = time.time()
-        with tqdm(total=self.num_queries ** self.depth, desc="Generating Queries") as pbar:
-            self.build_query_list(initial_question)
-            pbar.update(self.total_steps)
+        total_progress_steps = self.num_queries ** self.depth
+        logger.info(f"Starting query generation for: {initial_question}")
+        with tqdm(total=total_progress_steps, desc="Generating Queries") as pbar:
+            self.query_tree = {}
+            self.build_query_list(initial_question, self.query_tree, pbar=pbar)
         elapsed_time = time.time() - start_time
-        logger.debug(f"Total queries generated: {self.total_queries_generated}")
-        logger.debug(f"Requests sent to search: {self.requests_sent_to_search}")
-        logger.debug(f"Requests sent to LLM: {self.requests_sent_to_llm}")
-        logger.debug(f"Cache retrievals: {self.cache_retrievals}")
-        logger.debug(f"Completed in {elapsed_time:.2f} seconds")
-        logger.debug(f"Overall progress: 100%")
+        logger.info(f"Total queries generated: {self.total_queries_generated}")
+        logger.info(f"Requests sent to search: {self.requests_sent_to_search}")
+        logger.info(f"Requests sent to LLM: {self.requests_sent_to_llm}")
+        logger.info(f"Cache retrievals: {self.cache_retrievals}")
+        logger.info(f"Completed in {elapsed_time:.2f} seconds")
+        logger.info(f"Overall progress: 100%")
 
 if __name__ == "__main__":
-    initial_question = "What are the long-term economic impacts of implementing universal basic income in developed countries, considering both macroeconomic stability and income inequality?"
+    initial_question = "What are the fundamental properties of two-dimensional materials like graphene, and how can they be harnessed to develop next-generation electronic and photonic devices?"
+    initial_question = "What are the long-term economic impacts of implementing universal basic income in developed countries, considering both macroeconomic stability and income inequality"
 
     output_folder = os.path.join(os.getcwd(), "output")
     os.makedirs(output_folder, exist_ok=True)
@@ -114,7 +128,7 @@ if __name__ == "__main__":
     output_path = os.path.join(output_folder, output_filename)
 
     renderer = MarkdownRenderer(output_path)
-    generator = QueryGenerator(renderer, num_queries=1, depth=10)
+    generator = QueryGenerator(renderer, num_queries=5, depth=3)
     generator.save_to_markdown(initial_question)
 
     print(f"Queries saved to {output_path}")

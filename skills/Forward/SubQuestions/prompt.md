@@ -23,7 +23,11 @@ Take a moment to analyze the original question, the subquestion tree, and the cu
 </reflection>
 
 <query_generation>
-Generate between 1 and {{$NUM_QUERIES}} queries that break down the current subquestion into more focused parts. These queries should be optimized for effective Google searches to research the key aspects and nuances of the original question. Each query should be standalone, containing all the necessary context within itself to be meaningful and effective. Use Google search operators to make the queries more targeted and efficient. Avoid duplicating information that might already be covered in the search results of other subquestions.
+Generate between 1 and {{$NUM_QUERIES}} queries that break down the current subquestion into more focused parts. These queries should be:
+- optimized for effective web searches to research the key aspects and nuances of the original question
+- standalone, containing all the necessary context within itself to be meaningful and effective
+- unique and focused on gathering new information to fill the knowledge gaps identified in the reflection. Don't generate queries similar to the subquestions in the subquestion_tree
+- you should aim to reduce subquestion complexity. As the subquestion_tree grows, the queries should become more simple and should focus on specific aspects of the current subquestion
 
 Format your generated queries as follows:
 <queries>
