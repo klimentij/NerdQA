@@ -174,6 +174,13 @@ class Completion:
                 self.tools = json.load(f)
                 self.completion_kwargs['tools'] = self.tools
 
+        # Load response_format.json if it exists
+        response_format_path = os.path.join(skill_path, "response_format.json")
+        if os.path.exists(response_format_path):
+            with open(response_format_path, "r") as f:
+                self.response_format = json.load(f)
+                self.completion_kwargs['response_format'] = self.response_format
+
         # Overwrite model for completion if present
         if self.completion_model:
             logger.debug(f"Model defined in skill config has been overwritten to: {self.completion_model}")

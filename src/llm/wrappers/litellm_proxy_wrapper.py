@@ -19,7 +19,7 @@ class LiteLLMProxyWrapper:
             self,
             caching: bool = False,
             stream: bool = False,
-            interface: Literal['rest', 'openai'] = 'openai'):
+            interface: Literal['rest', 'openai'] = 'rest'):
         self.headers = {"Authorization": f"Bearer {litellm_cfg['general_settings']['master_key']}", "Content-Type": "application/json"}
         self.caching = caching  # Enable or disable caching
         self.stream = stream

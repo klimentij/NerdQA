@@ -48,11 +48,7 @@ class QueryGenerator:
         self.num_queries = num_queries
         self.depth = depth
         self.web_search = BraveSearchClient()
-        self.skill = Completion(
-            ('Forward', 'SubQuestions'),
-            user_id="KB",
-            completion_kwargs={"response_format": MathReasoning}
-            )
+        self.skill = Completion(('Forward', 'SubQuestions'))
         self.total_queries_generated = 0
         self.renderer = renderer
         self.requests_sent_to_search = 0

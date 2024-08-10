@@ -1,0 +1,27 @@
+{
+    "type": "json_schema",
+    "json_schema": {
+      "name": "math_reasoning",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "explanation": { "type": "string" },
+                "output": { "type": "string" }
+              },
+              "required": ["explanation", "output"],
+              "additionalProperties": false
+            }
+          },
+          "answerrr": { "type": "string" }
+        },
+        "required": ["steps", "answerrr"],
+        "additionalProperties": false
+      },
+      "strict": true
+    }
+  }
