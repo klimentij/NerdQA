@@ -1,27 +1,25 @@
 {
-    "type": "json_schema",
-    "json_schema": {
-      "name": "math_reasoning",
-      "schema": {
-        "type": "object",
-        "properties": {
-          "steps": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "explanation": { "type": "string" },
-                "output": { "type": "string" }
-              },
-              "required": ["explanation", "output"],
-              "additionalProperties": false
-            }
-          },
-          "answerrr": { "type": "string" }
+  "type": "json_schema",
+  "json_schema": {
+    "name": "subquestion_analysis",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A paragraph containing reflection on the original question, subquestion tree, current subquestion, and search results"
         },
-        "required": ["steps", "answerrr"],
-        "additionalProperties": false
+        "queries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "An array of generated query strings"
+        }
       },
-      "strict": true
-    }
+      "required": ["reflection", "queries"],
+      "additionalProperties": false
+    },
+    "strict": true
   }
+}
