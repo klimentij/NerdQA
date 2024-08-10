@@ -14,6 +14,11 @@ model_list:
       model: gpt-4o ### MODEL NAME sent to `litellm.completion()` ###
       api_key: "os.environ/OPENAI_API_KEY" # does os.getenv
       rpm: 6      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
+  - model_name: gpt-4o-mini ### RECEIVED MODEL NAME ###
+    litellm_params: # all params accepted by litellm.completion() - https://docs.litellm.ai/docs/completion/input
+      model: gpt-4o-mini ### MODEL NAME sent to `litellm.completion()` ###
+      api_key: "os.environ/OPENAI_API_KEY" # does os.getenv
+      rpm: 20      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
       
 litellm_settings:
   num_retries: 3 # retry call 3 times on each model_name (e.g. zephyr-beta)
@@ -23,4 +28,4 @@ litellm_settings:
 
 general_settings: 
   master_key: "sk-ade-myreallystrongmasterkeyhahah4359rt8guifhj" # [OPTIONAL] Only use this if you to require all calls to contain this key (Authorization: Bearer sk-1234)
-  database_url: "postgresql://klim:mypasswordlongnicepwd32rf23r9fu@localhost/litellm"
+  # database_url: "postgresql://postgres.xflzlnqtoarcfelrdbvv:nessyd-mesTef-kesvi2@aws-0-us-east-1.pooler.supabase.com:6543/postgres"

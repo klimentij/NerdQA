@@ -5,6 +5,7 @@ import time
 import sys
 from typing import List
 from abc import ABC, abstractmethod
+from pydantic import BaseModel
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -33,12 +34,25 @@ class MarkdownRenderer(Renderer):
         with open(self.filepath, 'a') as f:
             f.write(content + '\n')
 
+class Step(BaseModel):
+    explanation: str
+    output: str
+
+class MathReasoning(BaseModel):
+    steps: list[Step]
+    final_answer: str
+
+
 class QueryGenerator:
     def __init__(self, renderer: Renderer, num_queries: int = 3, depth: int = 3):
         self.num_queries = num_queries
         self.depth = depth
         self.web_search = BraveSearchClient()
-        self.skill = Completion(('Forward', 'SubQuestions'))
+        self.skill = Completion(
+            ('Forward', 'SubQuestions'),
+            user_id="KB",
+            completion_kwargs={"response_format": MathReasoning}
+            )
         self.total_queries_generated = 0
         self.renderer = renderer
         self.requests_sent_to_search = 0
@@ -119,6 +133,8 @@ class QueryGenerator:
 if __name__ == "__main__":
     initial_question = "What are the fundamental properties of two-dimensional materials like graphene, and how can they be harnessed to develop next-generation electronic and photonic devices?"
     initial_question = "What are the long-term economic impacts of implementing universal basic income in developed countries, considering both macroeconomic stability and income inequality"
+    initial_question = "What are the key feedback mechanisms in the Earth's climate system that drive tipping points, and how can we model and predict their occurrence to inform global climate policy?"
+    initial_question = "Looking for AI-powered research tools for in-depth research and complex questions"
 
     output_folder = os.path.join(os.getcwd(), "output")
     os.makedirs(output_folder, exist_ok=True)
@@ -128,7 +144,7 @@ if __name__ == "__main__":
     output_path = os.path.join(output_folder, output_filename)
 
     renderer = MarkdownRenderer(output_path)
-    generator = QueryGenerator(renderer, num_queries=5, depth=3)
+    generator = QueryGenerator(renderer, num_queries=2, depth=2)
     generator.save_to_markdown(initial_question)
 
     print(f"Queries saved to {output_path}")

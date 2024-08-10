@@ -9,3 +9,4 @@ import subprocess
 
 # Run the litellm command
 subprocess.run(["litellm", "--config", "config/litellm.yml"])
+

@@ -3,7 +3,7 @@ import os
 import time
 import requests
 from threading import Thread
-from typing import Union, List, Dict, Optional
+from typing import Union, List, Dict, Optional, Literal
 
 from src.llm.response import Response
 from src.util.env_util import cfg, litellm_cfg
@@ -12,16 +12,26 @@ from src.db.cache_llm import CacheLLM
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__, 'INFO')
 
+import openai
+
 class LiteLLMProxyWrapper:
     def __init__(
             self,
             caching: bool = False,
             stream: bool = False,
-    ):
+            interface: Literal['rest', 'openai'] = 'openai'):
         self.headers = {"Authorization": f"Bearer {litellm_cfg['general_settings']['master_key']}", "Content-Type": "application/json"}
         self.caching = caching  # Enable or disable caching
         self.stream = stream
+        self.interface = interface
         
+        # Initialize OpenAI client if using 'openai' interface
+        if self.interface == 'openai':
+            self.openai_client = openai.OpenAI(
+                api_key=litellm_cfg['general_settings']['master_key'],
+                base_url=f"{cfg['api']['llm']['base']}"
+            )
+
         # init cache
         self.cache = CacheLLM()
 
@@ -74,7 +84,13 @@ class LiteLLMProxyWrapper:
         # Calculate and store latency for the single request
         latency = end_time - start_time
         logger.debug(f"API request took {latency} seconds")
-        result = response.json()
+        
+        if self.interface == 'rest':
+            result = response.json()
+        elif self.interface == 'openai':
+            result = response.dict()
+        else:
+            raise ValueError(f"Invalid interface: {self.interface}")
 
         # inject prefilled content into the result
         if prefill:
@@ -92,21 +108,31 @@ class LiteLLMProxyWrapper:
         
 
     def _complete(self, model, messages, **kwargs):
+        if self.interface == 'rest':
+            # Existing REST implementation
+            url = f"{cfg['api']['llm']['base']}/chat/completions"
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f"Bearer {litellm_cfg['general_settings']['master_key']}"
+            }
+            data = {
+                "model": model,
+                "messages": messages,
+            }
+            data.update(kwargs)
 
-        url = f"{cfg['api']['llm']['base']}/chat/completions"
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f"Bearer {litellm_cfg['general_settings']['master_key']}"
-        }
-        data = {
-            "model": model,
-            "messages": messages,
-        }
-        data.update(kwargs)
-
-        logger.debug(f"Making API request to {url}. \n\nData: {json.dumps(data, indent=2)}")
-        result = requests.post(url, headers=headers, json=data)
-        return result
+            logger.debug(f"Making API request to {url}. \n\nData: {json.dumps(data, indent=2)}")
+            result = requests.post(url, headers=headers, json=data)
+            return result
+        elif self.interface == 'openai':
+            # OpenAI SDK implementation
+            response = self.openai_client.beta.chat.completions.parse(
+                model=model,
+                messages=messages,
+                **kwargs
+            )
+            print(type(response), response)
+            return response
 
 
     def _update_cache(self, payload, result, latency=None):
@@ -119,4 +145,3 @@ class LiteLLMProxyWrapper:
             meta["latency"] = latency
         self.cache.set(payload, meta, result)
         logger.debug(f"Response with code 200 cached")
-
