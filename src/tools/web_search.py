@@ -53,7 +53,14 @@ class BraveSearchClient:
         # Check cache
         cached_response = self.cache.get(params)
         if cached_response:
-            return cached_response
+            # Convert to dict if it's a string
+            if isinstance(cached_response, str):
+                try:
+                    return json.loads(cached_response)
+                except json.JSONDecodeError:
+                    logger.error("Failed to decode cached response as JSON")
+                    return None
+            return cached_response  # Already a dict
 
         try:
             logger.debug(f"Sending search request to Brave API: {params}")
@@ -62,6 +69,10 @@ class BraveSearchClient:
 
             # Filter results and add IDs
             filtered_results = self._filter_results(response.json())
+
+            # Add debug log for number of returned results
+            num_results = len(filtered_results['web']['results'])
+            logger.debug(f"Number of returned results: {num_results}")
 
             # Store filtered results in cache
             latency = time.time() - start_time
@@ -116,7 +127,7 @@ class BraveSearchClient:
         """
         current_ts = int(time.time() * 1000)
         text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
-        unique_id = f"s{current_ts}{text_hash % 10000:04d}"
+        unique_id = f"E{current_ts}{text_hash % 10000:04d}"
         return {"id": unique_id, "text": text}
 
 # Example usage

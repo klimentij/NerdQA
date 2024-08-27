@@ -1,0 +1,22 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "next_query_generation",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A paragraph containing reflection on the main research question, current query, new statements, and previous queries and statements"
+        },
+        "next_query": {
+          "type": "string",
+          "description": "The generated next query for the research process, concise and suitable for a search engine"
+        }
+      },
+      "required": ["reflection", "next_query"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}
