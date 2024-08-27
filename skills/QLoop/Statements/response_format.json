@@ -7,7 +7,7 @@
       "properties": {
         "reflection": {
           "type": "string",
-          "description": "A paragraph containing reflection on the main research question, current question, search results, and previously made statements"
+          "description": "A paragraph containing reflection on the main research question, current question, search results, and previously made statements. Include analysis of relevance, key information, gaps, contradictions, and factual content."
         },
         "statements": {
           "type": "array",
@@ -16,28 +16,28 @@
             "properties": {
               "explanation": {
                 "type": "string",
-                "description": "A brief explanation of how the evidence supports the statement"
+                "description": "A brief explanation of how the evidence directly supports the statement, quoting relevant parts of the evidence. Do not make inferences or generalizations beyond what is directly stated."
               },
               "evidence": {
                 "type": "array",
                 "items": {
                   "type": "string"
                 },
-                "description": "A list of evidence IDs that directly support the statement. If IDs are not available, provide URLs"
+                "description": "A list of evidence IDs that directly support the statement. Each piece of evidence must explicitly support the claim made."
               },
               "text": {
                 "type": "string",
-                "description": "The statement text, formulated as a clear, concise claim"
+                "description": "The statement text, formulated as a clear, concise claim that directly reflects the evidence. Use precise language that accurately reflects the certainty or uncertainty in the source material."
               },
               "support_score": {
                 "type": "number",
-                "description": "A score between 0.5 and 1 indicating the strength and relevance of the evidence. If the score is below 0.5, the statement is not supported by the evidence, and should be discarded."
+                "description": "A score between 0.9 and 1 indicating the strength and relevance of the evidence. Statements with a score below 0.9 should not be included."
               }
             },
             "required": ["explanation", "evidence", "text", "support_score"],
             "additionalProperties": false
           },
-          "description": "An array of generated statements with their supporting evidence and explanations"
+          "description": "An array of generated statements with their supporting evidence and explanations. Include only statements that are directly supported by the evidence and relevant to the current question."
         }
       },
       "required": ["reflection", "statements"],
