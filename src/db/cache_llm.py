@@ -2,19 +2,22 @@ import json
 import hashlib
 import os
 import time
+from supabase import create_client, Client
 
 os.chdir(__file__.split('src/')[0])
 import sys
 sys.path.append(os.getcwd())
 
-from src.db.database_connection import DatabaseConnection
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__)
 
-class CacheLLM(DatabaseConnection):
-    def __init__(self, ttl=2592000):  # Default TTL of 30 days
-        super().__init__()
+class CacheLLM:
+    def __init__(self, ttl=2592000):
         self.ttl = ttl
+        self.supabase: Client = create_client(
+            os.environ.get("SUPABASE_URL"),
+            os.environ.get("SUPABASE_KEY")
+        )
 
     def _hash(self, input):
         """Create a hash for a given input."""
@@ -24,56 +27,42 @@ class CacheLLM(DatabaseConnection):
         """Retrieve an item from the cache."""
         start_time = time.time()
         key = self._hash(payload)
-        start_time = time.time()
-        with self.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT response FROM cache_llm WHERE payload_hash = %(key)s",
-                            {'key': key})
-                result = cur.fetchone()
-                logger.debug(f"Checked cache for key: '{key}'. Took {time.time() - start_time:.10f} seconds.")
-                return result['response'] if result else None
+
+        response = self.supabase.table('cache_llm').select('response').eq('payload_hash', key).execute()
+        result = response.data[0] if response.data else None
+
+        query_time = time.time() - start_time
+        if result:
+            logger.debug(f"Cache hit for key '{key}'. Retrieved in {query_time:.6f} seconds.")
+        else:
+            logger.debug(f"Cache miss for key '{key}'. Lookup took {query_time:.6f} seconds.")
+        
+        return result['response'] if result else None
 
     def set(self, payload, headers, response):
         """Store an item in the cache."""
         start_time = time.time()
         key = self._hash(payload)
-        env = headers.get('env')
-        latency = headers.get('latency')
-        model = headers.get('model')
-        skill = headers.get('skill')
-        user_id = headers.get('user_id')
+        data = {
+            'payload_hash': key,
+            'env': headers.get('env'),
+            'latency': headers.get('latency'),
+            'model': headers.get('model'),
+            'skill': headers.get('skill'),
+            'user_id': headers.get('user_id'),
+            'payload': json.dumps(payload),
+            'response': json.dumps(response)
+        }
 
-        with self.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO cache_llm (payload_hash, env, latency, model, skill, user_id, payload, response)
-                    VALUES (%(key)s, %(env)s, %(latency)s, %(model)s, %(skill)s, %(user_id)s, %(payload)s, %(response)s)
-                    ON CONFLICT (payload_hash) DO UPDATE SET
-                        response = EXCLUDED.response,
-                        timestamp = CURRENT_TIMESTAMP
-                    """,
-                    {
-                        'key': key,
-                        'env': env,
-                        'latency': latency,
-                        'model': model,
-                        'skill': skill,
-                        'user_id': user_id,
-                        'payload': json.dumps(payload),
-                        'response': json.dumps(response)
-                    }
-                )
-                conn.commit()
-        logger.debug(f"Saved response in cache for key: {key}. Took {time.time() - start_time:.10f} seconds.")
+        self.supabase.table('cache_llm').upsert(data).execute()
 
+        query_time = time.time() - start_time
+        logger.debug(f"Cache set for key '{key}' took {query_time:.6f} seconds.")
 
     def delete(self, payload):
         """Delete an item from the cache."""
         key = self._hash(payload)
-        with self.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM cache_llm WHERE payload_hash = %(key)s", {'key': key})
-                conn.commit()
+        self.supabase.table('cache_llm').delete().eq('payload_hash', key).execute()
 
 # # Example usage:
 # cache = CacheLLM()

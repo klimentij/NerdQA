@@ -60,11 +60,29 @@ class LiteLLMProxyWrapper:
 
         try:
             if self.caching:  # Check if response is in cache
-                response = self.cache.get(payload)
-                if response is not None:
+                cached_response = self.cache.get(payload)
+                if cached_response is not None:
                     logger.debug(f"Response found in cache, returning cached response")
-                    response['from_cache'] = True
-                    return response
+                    if isinstance(cached_response, str):
+                        # If cached_response is a string, assume it's JSON and parse it
+                        try:
+                            cached_response = json.loads(cached_response)
+                        except json.JSONDecodeError:
+                            logger.warning("Failed to parse cached response as JSON")
+                            # If parsing fails, fall through to making a new API request
+                        else:
+                            return {
+                                **cached_response,
+                                'from_cache': True
+                            }
+                    elif isinstance(cached_response, dict):
+                        return {
+                            **cached_response,
+                            'from_cache': True
+                        }
+                    else:
+                        logger.warning(f"Unexpected cached response type: {type(cached_response)}")
+                        # Fall through to making a new API request
                 else:
                     logger.debug(f"Response not found in cache, making API request")
 

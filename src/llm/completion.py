@@ -136,12 +136,21 @@ class Completion:
             
             min_length_sum = sum([t.min_length for t in self.trim])
             if min_length_sum > limit:
-                raise ValueError(f"Sum of trim min_lengths {min_length_sum} exceed limit of {limit} for the skill {self.skill}. Adjust trim min_lengths or completions parameters")
+                raise ValueError(f"Sum of trim min_lengths {min_length_sum} exceed limit of {limit} for the skill {self.skill}. "
+                                 f"Limit is calculated as: context length ({self.llm_context_length}) - "
+                                 f"trim_just_in_case_tokens ({self.trim_just_in_case_tokens}) - "
+                                 f"prompt length ({self.prompt_len}) - "
+                                 f"max_tokens ({self.completion_kwargs['max_tokens']}). "
+                                 f"Adjust trim min_lengths or completion parameters.")
             
             for t in self.trim:
                 if t.max_length is not None and t.max_length > limit:
-                    raise ValueError(f"Trim {t.name} max_length {t.max_length} exceed limit of {limit} for the skill {self.skill}. Adjust trim max_lengths or completions parameters")
-                
+                    raise ValueError(f"Trim {t.name} max_length {t.max_length} exceed limit of {limit} for the skill {self.skill}. "
+                                     f"Limit is calculated as: context length ({self.llm_context_length}) - "
+                                     f"trim_just_in_case_tokens ({self.trim_just_in_case_tokens}) - "
+                                     f"prompt length ({self.prompt_len}) - "
+                                     f"max_tokens ({self.completion_kwargs['max_tokens']}). "
+                                     f"Adjust trim max_lengths or completion parameters.")
 
     def __call__(self, **kwargs):
         """Allows the class instance to be called directly."""
@@ -192,7 +201,7 @@ class Completion:
             logger.exception(f"Failed to update completion_kwargs, observability_tool_kwargs, observability_tool_properties from skill config")
 
         self.litellm_model_config = [m for m in litellm_cfg['model_list'] if m['model_name'] == self.completion_kwargs['model']][0]
-        self.llm_context_length = self.litellm_model_config.get("context_length", 8192)
+        self.llm_context_length = self.litellm_model_config.get("context_length", 128000)
         self.trim_limit_chars = self.llm_context_length * 6 # roughly the llm context length, to protect llm tokenizer from extremely long inputs
         self.tokenizer = VdTokenizer(scfg['completion_kwargs']['model'])
         self.prompt_len = len(self.tokenizer.encode(str(self.prompt)))

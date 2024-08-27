@@ -1,4 +1,7 @@
-litellm[proxy]
-prisma
-ipykernel
-psycopg[binary,pool]
+ipykernel==6.29.5
+litellm[proxy]==1.44.7
+prisma==0.14.0
+psycopg==3.2.1
+psycopg-binary==3.2.1
+psycopg-pool==3.2.2
+supabase==2.7.3

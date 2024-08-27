@@ -1,0 +1,48 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "statement_generation",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A paragraph containing reflection on the main research question, current question, search results, and previously made statements"
+        },
+        "statements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "explanation": {
+                "type": "string",
+                "description": "A brief explanation of how the evidence supports the statement"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "A list of evidence IDs that directly support the statement. If IDs are not available, provide URLs"
+              },
+              "text": {
+                "type": "string",
+                "description": "The statement text, formulated as a clear, concise claim"
+              },
+              "support_score": {
+                "type": "number",
+                "description": "A score between 0.5 and 1 indicating the strength and relevance of the evidence. If the score is below 0.5, the statement is not supported by the evidence, and should be discarded."
+              }
+            },
+            "required": ["explanation", "evidence", "text", "support_score"],
+            "additionalProperties": false
+          },
+          "description": "An array of generated statements with their supporting evidence and explanations"
+        }
+      },
+      "required": ["reflection", "statements"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

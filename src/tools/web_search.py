@@ -5,6 +5,7 @@ import json
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+import hashlib
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -52,21 +53,22 @@ class BraveSearchClient:
         # Check cache
         cached_response = self.cache.get(params)
         if cached_response:
-            latency = time.time() - start_time
-            logger.debug(f"Cache hit for query: {query}. Retrieved in {latency:.10f} seconds.")
-            return self._filter_results(cached_response)
+            return cached_response
 
         try:
             logger.debug(f"Sending search request to Brave API: {params}")
             response = self.session.get(self.base_url, headers=self.headers, params=params)
             response.raise_for_status()
 
-            # Store response in cache
-            latency = time.time() - start_time
-            logger.debug(f"Received response in {latency:.4f} seconds")
-            self.cache.set(params, self.headers, response.json())
+            # Filter results and add IDs
+            filtered_results = self._filter_results(response.json())
 
-            return self._filter_results(response.json())
+            # Store filtered results in cache
+            latency = time.time() - start_time
+            logger.debug(f"Received and processed response in {latency:.4f} seconds")
+            self.cache.set(params, self.headers, filtered_results)
+
+            return filtered_results
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTPError during search: {e}")
             raise
@@ -76,18 +78,46 @@ class BraveSearchClient:
 
     def _filter_results(self, response):
         """
-        Filter the search results to include only specified keys.
+        Filter the search results to include only specified keys and format description and extra_snippets.
 
         Parameters:
             response (dict): The raw search results.
 
         Returns:
-            dict: The filtered search results.
+            dict: The filtered search results with formatted description and extra_snippets.
         """
         keys_to_keep = ['title', 'page_age', 'description', 'extra_snippets']
         results = response.get('web', {}).get('results', [])
-        filtered_results = [{key: result[key] for key in keys_to_keep if key in result} for result in results]
+        filtered_results = []
+
+        for result in results:
+            filtered_result = {}
+            for key in keys_to_keep:
+                if key in result:
+                    if key == 'description':
+                        filtered_result[key] = self._format_text_as_json(result[key])
+                    elif key == 'extra_snippets':
+                        filtered_result[key] = [self._format_text_as_json(snippet) for snippet in result[key]]
+                    else:
+                        filtered_result[key] = result[key]
+            filtered_results.append(filtered_result)
+
         return {'web': {'results': filtered_results}}
+
+    def _format_text_as_json(self, text):
+        """
+        Format text as a JSON object with 'id' and 'text' keys.
+
+        Parameters:
+            text (str): The text to format.
+
+        Returns:
+            dict: A JSON object with 'id' and 'text' keys.
+        """
+        current_ts = int(time.time() * 1000)
+        text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
+        unique_id = f"s{current_ts}{text_hash % 10000:04d}"
+        return {"id": unique_id, "text": text}
 
 # Example usage
 # brave_search = BraveSearchClient()
