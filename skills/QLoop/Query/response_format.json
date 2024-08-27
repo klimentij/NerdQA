@@ -5,16 +5,20 @@
     "schema": {
       "type": "object",
       "properties": {
-        "reflection": {
+        "progress_assessment": {
           "type": "string",
-          "description": "A paragraph containing reflection on the main research question, current query, new statements, and previous queries and statements"
+          "description": "A brief assessment of the current research progress"
+        },
+        "strategy": {
+          "type": "string",
+          "description": "The chosen strategy for the next query, explaining how it addresses the current state of research"
         },
         "next_query": {
           "type": "string",
           "description": "The generated next query for the research process, concise and suitable for a search engine"
         }
       },
-      "required": ["reflection", "next_query"],
+      "required": ["progress_assessment", "strategy", "next_query"],
       "additionalProperties": false
     },
     "strict": true

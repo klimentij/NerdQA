@@ -14,16 +14,16 @@
           "items": {
             "type": "object",
             "properties": {
-              "explanation": {
-                "type": "string",
-                "description": "A brief explanation of how the evidence directly supports the statement, quoting relevant parts of the evidence. Do not make inferences or generalizations beyond what is directly stated."
-              },
               "evidence": {
                 "type": "array",
                 "items": {
                   "type": "string"
                 },
-                "description": "A list of evidence IDs that directly support the statement. Each piece of evidence must explicitly support the claim made."
+                "description": "A list of evidence IDs that directly support the statement. Each piece of evidence must explicitly support the claim made. Evidence IDs are unique identifiers for each piece of evidence, prefixed with 'E' followed by a timestamp and a random number."
+              },
+              "explanation": {
+                "type": "string",
+                "description": "A brief explanation of how the evidence directly supports the statement, quoting relevant parts of the evidence. Do not make inferences or generalizations beyond what is directly stated."
               },
               "text": {
                 "type": "string",

@@ -53,7 +53,7 @@ Critical requirements for each statement:
 
 Generate only statements that meet ALL of these criteria. It is far better to produce fewer, highly accurate statements or even no statements at all than to include any that are not directly supported by the evidence or are irrelevant to the question at hand.
 
-Here are examples to illustrate the level of precision and evidence-based statements we're looking for:
+Here are examples to illustrate the level of precision and evidence-based statements we're looking for, including proper explanations:
 
 Example 1:
 Context 1: "A 2022 study in Nature Climate Change found that Arctic sea ice extent has decreased by an average of 13.1% per decade since 1979 based on satellite observations."
@@ -61,7 +61,11 @@ Context 2: "The National Snow and Ice Data Center reported that the Arctic sea i
 
 Good statement: "Satellite data shows a declining trend in Arctic sea ice extent, with a 2022 Nature Climate Change study reporting an average decrease of 13.1% per decade since 1979, and the National Snow and Ice Data Center noting that September 2022 had the 10th lowest extent on record at approximately 1.54 million square miles."
 
+Explanation: This statement is directly supported by both pieces of evidence. The Nature Climate Change study explicitly states the 13.1% decrease per decade, while the National Snow and Ice Data Center provides the specific data point for September 2022. The statement accurately reflects the information without making unsupported generalizations.
+
 Borderline statement: "Arctic sea ice is disappearing at an accelerating rate, with recent data suggesting it may be completely gone within the next few decades, which will have catastrophic effects on global climate patterns."
+
+Why it's borderline: This statement goes beyond the provided evidence. While the data shows a decline in sea ice, it doesn't mention an accelerating rate or predict complete disappearance. The claim about catastrophic effects on global climate patterns is not supported by the given context.
 
 Example 2:
 Context 1: "A longitudinal study published in JAMA Psychiatry followed 1,037 individuals from birth to age 45 and found that those who reported chronic loneliness were 49% more likely to experience depression."
@@ -69,7 +73,11 @@ Context 2: "The World Health Organization estimates that 280 million people worl
 
 Good statement: "Research indicates a potential link between chronic loneliness and depression, with a JAMA Psychiatry study finding a 49% higher likelihood of depression among chronically lonely individuals, while the WHO estimates that depression affects 280 million people worldwide."
 
+Explanation: This statement accurately represents both pieces of evidence. It uses the phrase "potential link" to reflect the correlational nature of the JAMA Psychiatry study's findings, and directly cites the WHO's estimate of depression prevalence. The statement combines the information without overstating the conclusions.
+
 Borderline statement: "Loneliness is the primary cause of the global depression epidemic, affecting hundreds of millions of people, and addressing social isolation would solve most mental health issues worldwide."
+
+Why it's borderline: This statement makes causal claims and generalizations not supported by the given evidence. The study only shows a correlation between loneliness and depression, not causation. The claim about solving most mental health issues is not supported by the provided context.
 
 Example 3:
 Context 1: "A 2021 meta-analysis in the Journal of Clinical Medicine, reviewing 17 studies, found that mindfulness-based interventions were associated with a moderate reduction in anxiety symptoms compared to control groups."
@@ -77,12 +85,16 @@ Context 2: "A randomized controlled trial published in JAMA Internal Medicine in
 
 Good statement: "Recent research suggests potential benefits of mindfulness for anxiety reduction, with a 2021 meta-analysis finding moderate symptom reduction compared to control groups, and a 2023 randomized controlled trial showing a 20% greater reduction in anxiety scores for mindfulness participants compared to those in a stress management program."
 
+Explanation: This statement accurately summarizes both studies, using appropriate language to reflect the nature of the findings. It specifies the type of studies (meta-analysis and randomized controlled trial), their publication years, and key findings, without overgeneralizing the results or making unsupported claims about efficacy.
+
 Borderline statement: "Scientific studies have conclusively proven that mindfulness is the most effective treatment for anxiety disorders, outperforming all other therapeutic approaches and medications."
+
+Why it's borderline: This statement overstates the evidence provided. The studies show benefits of mindfulness for anxiety reduction, but they don't compare it to all other treatments or medications, nor do they "conclusively prove" it as the most effective treatment. The language used is too strong given the limited scope of the provided evidence.
 
 These examples demonstrate:
 1. How to synthesize information from multiple sources while maintaining accuracy and avoiding overreach.
-2. The good statements carefully combine information from different sources, maintaining the specific context and limitations of each study.
-3. The borderline statements make broader claims that go beyond the evidence provided, overgeneralize findings, or make causal claims not supported by the given information.
-4. The importance of preserving the nuance and specificity of scientific findings when reporting on them.
+2. The importance of providing explanations that directly link the statement to the evidence, quoting or paraphrasing key points from the context.
+3. How to use language that accurately reflects the level of certainty in the evidence, such as "suggests" or "indicates" rather than "proves" or "shows conclusively."
+4. The need to avoid making broader claims or generalizations that go beyond the specific findings reported in the evidence.
 
-Use these examples as a guide for generating your own statements, always prioritizing accuracy, relevance, and direct evidence support.
+Use these examples as a guide for generating your own statements and explanations, always prioritizing accuracy, relevance, and direct evidence support.
