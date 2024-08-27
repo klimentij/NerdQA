@@ -161,3 +161,8 @@ cython_debug/
 
 # logs
 logs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
