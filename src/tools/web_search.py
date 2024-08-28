@@ -125,9 +125,8 @@ class BraveSearchClient:
         Returns:
             dict: A JSON object with 'id' and 'text' keys.
         """
-        current_ts = int(time.time() * 1000)
         text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
-        unique_id = f"E{current_ts}{text_hash % 10000:04d}"
+        unique_id = f"E{text_hash % 10**10:010d}"
         return {"id": unique_id, "text": text}
 
 # Example usage

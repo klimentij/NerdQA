@@ -11,14 +11,17 @@
         },
         "strategy": {
           "type": "string",
-          "description": "The chosen strategy for the next query, explaining how it addresses the current state of research"
+          "description": "The chosen strategy for the next queries, explaining how it addresses the current state of research"
         },
-        "next_query": {
-          "type": "string",
-          "description": "The generated next query for the research process, concise and suitable for a search engine"
+        "next_queries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The generated next queries for the research process, concise and suitable for a search engine"
         }
       },
-      "required": ["progress_assessment", "strategy", "next_query"],
+      "required": ["progress_assessment", "strategy", "next_queries"],
       "additionalProperties": false
     },
     "strict": true

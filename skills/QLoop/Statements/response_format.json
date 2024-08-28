@@ -19,11 +19,11 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "A list of evidence IDs that directly support the statement. Each piece of evidence must explicitly support the claim made. Evidence IDs are unique identifiers for each piece of evidence, prefixed with 'E' followed by a timestamp and a random number."
+                "description": "A list of evidence IDs that directly support the statement. Must include both search result evidence (E.. ids) and previous statement evidence (S.. ids) where applicable. Each piece of evidence must explicitly support the claim made."
               },
               "explanation": {
                 "type": "string",
-                "description": "A brief explanation of how the evidence directly supports the statement, quoting relevant parts of the evidence. Do not make inferences or generalizations beyond what is directly stated."
+                "description": "A brief explanation of how the evidence directly supports the statement, quoting relevant parts of the evidence or previous statements. Do not make inferences or generalizations beyond what is directly stated."
               },
               "text": {
                 "type": "string",
@@ -37,7 +37,7 @@
             "required": ["explanation", "evidence", "text", "support_score"],
             "additionalProperties": false
           },
-          "description": "An array of generated statements with their supporting evidence and explanations. Include only statements that are directly supported by the evidence and relevant to the current question."
+          "description": "An array of generated statements with their supporting evidence and explanations. Include only statements that are directly supported by the evidence and relevant to the current question. Prioritize statements that use both search results and previous statements to enable multi-hop reasoning."
         }
       },
       "required": ["reflection", "statements"],
