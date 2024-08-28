@@ -177,5 +177,8 @@ class Pipeline:
 
 if __name__ == "__main__":
     main_question = "How LLMs affect the freedom of speech in Russia?"
+    main_question = "Can you refer me to research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
+    main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media?"
+
     pipeline = Pipeline()
     pipeline.run(main_question=main_question, iterations=3, num_queries=2)
