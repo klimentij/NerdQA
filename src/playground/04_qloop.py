@@ -59,13 +59,14 @@ class QueryGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Query'))
 
-    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, num_queries: int) -> List[str]:
+    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, previous_analysis: str, num_queries: int) -> List[str]:
         logger.info(f"Generating next {num_queries} queries")
         
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
                 "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements,
+                "PREVIOUS_ANALYSIS": previous_analysis,
                 "NUM_QUERIES": num_queries
             }
         )
@@ -85,15 +86,50 @@ class QueryGenerator:
             logger.error(f"Unexpected error in generate_next_queries: {e}")
             return []
 
+class AnswerGenerator:
+    def __init__(self):
+        self.skill = Completion(('QLoop', 'Answer'))
+
+    def generate_analysis_and_synthesis(self, main_question: str, research_history: str) -> dict:
+        logger.info("Generating research analysis and synthesis")
+        
+        result = self.skill.complete(
+            prompt_inputs={
+                "MAIN_QUESTION": main_question,
+                "RESEARCH_HISTORY": research_history
+            }
+        )
+
+        try:
+            # Check if the result has the expected structure
+            if not result.content:
+                logger.error("Empty response from LLM")
+                return {}
+
+            response_data = json.loads(result.content)
+            logger.info("Generated research analysis and synthesis")
+            return response_data
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}")
+            return {}
+        except AttributeError as e:
+            logger.error(f"Unexpected response structure: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Unexpected error in generate_analysis_and_synthesis: {e}")
+            return {}
+
 class Pipeline:
     def __init__(self):
         self.statement_generator = StatementGenerator()
         self.query_generator = QueryGenerator()
-        self.all_statements = {}  # New dictionary to store all statements
+        self.answer_generator = AnswerGenerator()
+        self.all_statements = {}  # Dictionary to store all statements
 
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
         current_queries = [main_question]
         previous_queries_and_statements = ""
+        previous_analysis = ""
 
         output_folder = os.path.join(os.getcwd(), "output")
         os.makedirs(output_folder, exist_ok=True)
@@ -124,7 +160,17 @@ class Pipeline:
                 self.append_to_markdown(current_query, statements, search_results, output_path, iteration + 1, self.all_statements)
                 print(f"Iteration {iteration + 1}, Query '{current_query}' appended to {output_path}")
 
-            next_queries = self.query_generator.generate_next_queries(main_question, previous_queries_and_statements, num_queries)
+            # Generate research analysis and synthesis
+            analysis_and_synthesis = self.answer_generator.generate_analysis_and_synthesis(main_question, previous_queries_and_statements)
+            if analysis_and_synthesis:
+                self.append_analysis_and_synthesis_to_markdown(analysis_and_synthesis, output_path, iteration + 1)
+                previous_analysis = json.dumps(analysis_and_synthesis)
+            else:
+                logger.warning(f"Failed to generate analysis and synthesis for iteration {iteration + 1}")
+                self.append_error_to_markdown(output_path, iteration + 1)
+                previous_analysis = ""
+
+            next_queries = self.query_generator.generate_next_queries(main_question, previous_queries_and_statements, previous_analysis, num_queries)
             if not next_queries:
                 logger.error("Failed to generate next queries. Stopping the pipeline.")
                 break
@@ -175,10 +221,45 @@ class Pipeline:
             if not statements:
                 f.write(f"\n### Note\n\nNo relevant evidence was found for this query. The research will continue with the next iteration.\n\n")
 
+    @staticmethod
+    def append_analysis_and_synthesis_to_markdown(analysis_and_synthesis: dict, filepath: str, iteration: int) -> None:
+        with open(filepath, 'a') as f:
+            f.write(f"\n## Research Analysis and Synthesis (Iteration {iteration})\n\n")
+            
+            f.write("### Critical Analysis\n\n")
+            critical_analysis = analysis_and_synthesis.get('critical_analysis', {})
+            f.write(f"**Overall Assessment:** {critical_analysis.get('overall_assessment', 'N/A')}\n\n")
+            
+            f.write("**Over-explored Areas:**\n")
+            for area in critical_analysis.get('over_explored_areas', []):
+                f.write(f"- {area}\n")
+            f.write("\n")
+            
+            f.write("**Under-explored Areas:**\n")
+            for area in critical_analysis.get('under_explored_areas', []):
+                f.write(f"- {area}\n")
+            f.write("\n")
+            
+            f.write(f"**Evidence Quality:** {critical_analysis.get('evidence_quality', 'N/A')}\n\n")
+            f.write(f"**Next Directions:** {critical_analysis.get('next_directions', 'N/A')}\n\n")
+            f.write(f"**Limitations:** {critical_analysis.get('limitations', 'N/A')}\n\n")
+            
+            f.write("### Best Possible Answer Synthesis\n\n")
+            synthesis = analysis_and_synthesis.get('synthesized_answer', [])
+            for sentence in synthesis:
+                f.write(f"- {sentence['sentence']}\n")
+                f.write(f"  Support: {', '.join(sentence['support'])}\n\n")
+
+    @staticmethod
+    def append_error_to_markdown(filepath: str, iteration: int) -> None:
+        with open(filepath, 'a') as f:
+            f.write(f"\n## Research Analysis and Synthesis (Iteration {iteration})\n\n")
+            f.write("Error: Failed to generate research analysis and synthesis for this iteration.\n\n")
+
 if __name__ == "__main__":
     main_question = "How LLMs affect the freedom of speech in Russia?"
-    main_question = "Can you refer me to research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
-    main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media?"
+    # main_question = "Can you refer me to research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
+    # main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media??"
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=3, num_queries=2)
+    pipeline.run(main_question=main_question, iterations=2, num_queries=1)

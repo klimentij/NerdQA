@@ -30,7 +30,8 @@ class Response:
         else:
             self.cost = 0 #self._get_cost()
 
-        if response.get('choices', [])[0].get('message', {}).get('tool_calls', []):
+        choices = response.get('choices', [])
+        if choices and choices[0].get('message', {}).get('tool_calls', []):
             # and response.get('choices', [])[0].get('finish_reason') == 'tool_calls':
             self.tool_calls = response['choices'][0]['message']['tool_calls']
 

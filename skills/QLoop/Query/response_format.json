@@ -18,7 +18,7 @@
           "items": {
             "type": "string"
           },
-          "description": "The generated next queries for the research process, concise and suitable for a search engine"
+          "description": "The queries for the research process are concise and suitable for a search engine. The number of queries must be exactly the one that is specified in the 'Number of Queries to Generate' section. Could be 1 or more."
         }
       },
       "required": ["progress_assessment", "strategy", "next_queries"],
