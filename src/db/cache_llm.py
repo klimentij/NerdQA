@@ -21,7 +21,7 @@ class CacheLLM:
 
     def _hash(self, input):
         """Create a hash for a given input."""
-        return hashlib.md5(str(input).encode('utf-8')).hexdigest()
+        return hashlib.md5(json.dumps(input, sort_keys=True).encode('utf-8')).hexdigest()
 
     def get(self, payload):
         """Retrieve an item from the cache."""
@@ -34,10 +34,10 @@ class CacheLLM:
         query_time = time.time() - start_time
         if result:
             logger.debug(f"Cache hit for key '{key}'. Retrieved in {query_time:.6f} seconds.")
+            return result['response']  # This is already a dict due to JSONB in Supabase
         else:
             logger.debug(f"Cache miss for key '{key}'. Lookup took {query_time:.6f} seconds.")
-        
-        return result['response'] if result else None
+            return None
 
     def set(self, payload, headers, response):
         """Store an item in the cache."""
@@ -50,8 +50,8 @@ class CacheLLM:
             'model': headers.get('model'),
             'skill': headers.get('skill'),
             'user_id': headers.get('user_id'),
-            'payload': json.dumps(payload),
-            'response': json.dumps(response)
+            'payload': payload,  # This will be stored as JSONB
+            'response': response  # This will be stored as JSONB
         }
 
         self.supabase.table('cache_llm').upsert(data).execute()

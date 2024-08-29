@@ -43,7 +43,7 @@ class BraveSearchClient:
             **kwargs: Optional parameters to override default search parameters.
 
         Returns:
-            dict: The filtered search results.
+            dict: The search results wrapped in a dictionary.
         """
         start_time = time.time()
         params = self.default_params.copy()
@@ -52,15 +52,9 @@ class BraveSearchClient:
 
         # Check cache
         cached_response = self.cache.get(params)
-        if cached_response:
-            # Convert to dict if it's a string
-            if isinstance(cached_response, str):
-                try:
-                    return json.loads(cached_response)
-                except json.JSONDecodeError:
-                    logger.error("Failed to decode cached response as JSON")
-                    return None
-            return cached_response  # Already a dict
+        if cached_response is not None:
+            logger.debug("Returning cached results")
+            return {"results": cached_response}
 
         try:
             logger.debug(f"Sending search request to Brave API: {params}")
@@ -71,15 +65,16 @@ class BraveSearchClient:
             filtered_results = self._filter_results(response.json())
 
             # Add debug log for number of returned results
-            num_results = len(filtered_results['web']['results'])
+            num_results = len(filtered_results)
             logger.debug(f"Number of returned results: {num_results}")
 
-            # Store filtered results in cache
+            # Store filtered results in cache as a dict
             latency = time.time() - start_time
             logger.debug(f"Received and processed response in {latency:.4f} seconds")
             self.cache.set(params, self.headers, filtered_results)
 
-            return filtered_results
+            # Wrap the results in a dictionary
+            return {"results": filtered_results}
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTPError during search: {e}")
             raise
@@ -89,45 +84,56 @@ class BraveSearchClient:
 
     def _filter_results(self, response):
         """
-        Filter the search results to include only specified keys and format description and extra_snippets.
+        Filter the search results to include only specified keys and format as a single-level list.
 
         Parameters:
             response (dict): The raw search results.
 
         Returns:
-            dict: The filtered search results with formatted description and extra_snippets.
+            list: A list of dictionaries, each containing 'id', 'text', and 'meta' keys.
         """
-        keys_to_keep = ['title', 'page_age', 'description', 'extra_snippets']
         results = response.get('web', {}).get('results', [])
         filtered_results = []
 
         for result in results:
-            filtered_result = {}
-            for key in keys_to_keep:
-                if key in result:
-                    if key == 'description':
-                        filtered_result[key] = self._format_text_as_json(result[key])
-                    elif key == 'extra_snippets':
-                        filtered_result[key] = [self._format_text_as_json(snippet) for snippet in result[key]]
-                    else:
-                        filtered_result[key] = result[key]
-            filtered_results.append(filtered_result)
+            meta = {
+                'title': result.get('title', ''),
+                'url': result.get('url', ''),
+                'page_age': result.get('page_age', '')
+            }
 
-        return {'web': {'results': filtered_results}}
+            # Create the main text from description and extra_snippets
+            main_text = result.get('description', '')
+            if 'extra_snippets' in result:
+                main_text += ' ' + ' '.join(result['extra_snippets'])
 
-    def _format_text_as_json(self, text):
+            # Add the main result
+            filtered_results.append(self._format_text_as_json(main_text, meta=meta))
+
+            # Add individual entries for description and extra_snippets
+            if 'description' in result:
+                filtered_results.append(self._format_text_as_json(result['description'], meta=meta))
+            
+            if 'extra_snippets' in result:
+                for snippet in result['extra_snippets']:    
+                    filtered_results.append(self._format_text_as_json(snippet, meta=meta))
+
+        return filtered_results
+
+    def _format_text_as_json(self, text, meta=None):
         """
-        Format text as a JSON object with 'id' and 'text' keys.
+        Format text as a JSON object with 'id', 'text', and 'meta' keys.
 
         Parameters:
             text (str): The text to format.
+            meta (dict): Metadata for the text.
 
         Returns:
-            dict: A JSON object with 'id' and 'text' keys.
+            dict: A JSON object with 'id', 'text', and 'meta' keys.
         """
         text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
         unique_id = f"E{text_hash % 10**10:010d}"
-        return {"id": unique_id, "text": text}
+        return {"id": unique_id, "text": text, "meta": meta or {}}
 
 # Example usage
 # brave_search = BraveSearchClient()
