@@ -394,6 +394,7 @@ class Completion:
             doc_placeholders = False,
             mock: bool = False, 
             completion_kwargs: Optional[Dict] = None,
+            generation_name_suffix: Optional[str] = "",
             ) -> Union[Response, List[Response]]:
         """
         Performs actual the completion.
@@ -406,7 +407,9 @@ class Completion:
             self.completion_kwargs['metadata'] = {}
         
         # Always set the generation_name in metadata
-        self.completion_kwargs['metadata']['generation_name'] = '/'.join(self.skill)
+        skill_path = '/'.join(self.skill)
+        suffix = self.completion_kwargs['metadata'].get('generation_name_suffix', '')
+        self.completion_kwargs['metadata']['generation_name'] = f"{skill_path}{suffix}"
 
         if doc_placeholders:
             self.doc_placeholders = doc_placeholders

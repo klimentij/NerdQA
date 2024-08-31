@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import datetime
+import hashlib
 import time
 from typing import List, Tuple, Optional
 
@@ -154,9 +155,13 @@ class Pipeline:
 
         for iteration in range(iterations):
             # Process only num_queries queries
-            for current_query in current_queries[:num_queries]:
+            for query_index, current_query in enumerate(current_queries[:num_queries], 1):
+                # Update metadata with iteration and query indices
+                metadata = self.get_metadata()
+                metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
+
                 statements, search_results = self.statement_generator.generate_statements(
-                    main_question, current_query, previous_queries_and_statements, self.metadata
+                    main_question, current_query, previous_queries_and_statements, metadata
                 )
                 
                 # Store all generated statements
@@ -164,18 +169,22 @@ class Pipeline:
                     self.all_statements[stmt['id']] = stmt['text']
 
                 previous_queries_and_statements += f"\nQuery: {current_query}\n"
-                for stmt in statements:
-                    previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
-                
-                if not statements:
-                    previous_queries_and_statements += f"\nNo relevant evidence was found for this query\n"
+                if statements:
+                    for stmt in statements:
+                        previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
+                else:
+                    previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
 
                 self.append_to_markdown(current_query, statements, search_results, output_path, iteration + 1, self.all_statements)
                 print(f"Iteration {iteration + 1}, Query '{current_query}' appended to {output_path}")
 
+            # Update metadata for analysis and synthesis
+            metadata = self.get_metadata()
+            metadata['generation_name_suffix'] = f" [It{iteration+1}]"
+
             # Generate research analysis and synthesis
             analysis_and_synthesis = self.answer_generator.generate_analysis_and_synthesis(
-                main_question, previous_queries_and_statements, self.metadata
+                main_question, previous_queries_and_statements, metadata
             )
             if analysis_and_synthesis:
                 self.append_analysis_and_synthesis_to_markdown(analysis_and_synthesis, output_path, iteration + 1)
@@ -185,8 +194,12 @@ class Pipeline:
                 self.append_error_to_markdown(output_path, iteration + 1)
                 previous_analysis = ""
 
+            # Update metadata for generating next queries
+            metadata = self.get_metadata()
+            metadata['generation_name_suffix'] = f" [It{iteration+1}]"
+
             next_queries = self.query_generator.generate_next_queries(
-                main_question, previous_queries_and_statements, previous_analysis, num_queries, self.metadata
+                main_question, previous_queries_and_statements, previous_analysis, num_queries, metadata
             )
             if not next_queries:
                 logger.error("Failed to generate next queries. Stopping the pipeline.")
@@ -199,10 +212,11 @@ class Pipeline:
 
     def get_metadata(self) -> dict:
         return {
-            "trace_name": self.main_question[:30],
+            "trace_name": self.main_question[:],
             "trace_id": self.trace_id,
             "trace_user_id": "Klim",
             "session_id": self.session_id,
+            "generation_name_suffix": ""  # Add this line
         }
 
     @staticmethod
@@ -282,9 +296,9 @@ class Pipeline:
             f.write("Error: Failed to generate research analysis and synthesis for this iteration.\n\n")
 
 if __name__ == "__main__":
-    main_question = "fdHowd LLMs affect the freedom of speech in Russia?????"
-    main_question = "Can you refer me to  research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
+    main_question = "Hodw LLMs affect the freedom of speech in Russia?????!"
+    # main_question = "Can you refer me to  research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
     # main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media??"
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=1, num_queries=1)
+    pipeline.run(main_question=main_question, iterations=2, num_queries=2)

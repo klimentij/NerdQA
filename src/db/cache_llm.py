@@ -20,8 +20,10 @@ class CacheLLM:
         )
 
     def _hash(self, input):
-        """Create a hash for a given input."""
-        return hashlib.md5(json.dumps(input, sort_keys=True).encode('utf-8')).hexdigest()
+        """Create a hash for a given input, excluding metadata."""
+        # Create a copy of the input without the 'metadata' key
+        input_without_metadata = {k: v for k, v in input.items() if k != 'metadata'}
+        return hashlib.md5(json.dumps(input_without_metadata, sort_keys=True).encode('utf-8')).hexdigest()
 
     def get(self, payload):
         """Retrieve an item from the cache."""
@@ -50,7 +52,7 @@ class CacheLLM:
             'model': headers.get('model'),
             'skill': headers.get('skill'),
             'user_id': headers.get('user_id'),
-            'payload': payload,  # This will be stored as JSONB
+            'payload': {k: v for k, v in payload.items() if k != 'metadata'},  # Store payload without metadata
             'response': response  # This will be stored as JSONB
         }
 
