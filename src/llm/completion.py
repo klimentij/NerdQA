@@ -103,8 +103,8 @@ class Completion:
         logger.user_id = user_id
         logger.turn_id = channel_id
 
-        # default caching is True, can be overwritten by skill config
-        self.caching = True 
+        # Change the default value of caching to False
+        self.caching = False 
 
         self._load_skill(self.skill)
 
@@ -207,9 +207,7 @@ class Completion:
         self.prompt_len = len(self.tokenizer.encode(str(self.prompt)))
         self.trim_label = "[trimmed]"
 
-        if scfg.get("caching") is not None:
-            self.caching = scfg.get("caching")
-
+        
         # If trimming is not overriden, use the skill config
         # which is like:
         """
