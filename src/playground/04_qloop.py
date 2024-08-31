@@ -130,11 +130,13 @@ class Pipeline:
         self.query_generator = QueryGenerator()
         self.answer_generator = AnswerGenerator()
         self.all_statements = {}  # Dictionary to store all statements
+        self.all_evidence = {}  # Dictionary to store all evidence
         self.pipeline_start_ts = int(time.time())
         self.trace_id = f"T{self.pipeline_start_ts}"
         self.session_id = f"S{self.pipeline_start_ts}"
         self.main_question = ""
         self.metadata = {}
+        self.latest_answer = []
 
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
         self.main_question = main_question
@@ -147,11 +149,8 @@ class Pipeline:
         os.makedirs(output_folder, exist_ok=True)
 
         safe_question = re.sub(r'[^\w\s-]', '', main_question[:30])
-        output_filename = f"{safe_question}_report.md"
-        output_path = os.path.join(output_folder, output_filename)
-
-        with open(output_path, 'w') as f:
-            f.write(f"# {main_question}\n\n")
+        output_filename = f"{safe_question}_report.html"
+        self.output_path = os.path.join(output_folder, output_filename)
 
         for iteration in range(iterations):
             # Process only num_queries queries
@@ -164,9 +163,12 @@ class Pipeline:
                     main_question, current_query, previous_queries_and_statements, metadata
                 )
                 
-                # Store all generated statements
+                # Store all generated statements and evidence
                 for stmt in statements:
-                    self.all_statements[stmt['id']] = stmt['text']
+                    self.all_statements[stmt['id']] = stmt  # Store the entire statement dictionary
+                    for evidence in stmt['evidence']:
+                        if evidence.startswith('E'):
+                            self.all_evidence[evidence] = self.get_snippet_text(evidence, search_results)
 
                 previous_queries_and_statements += f"\nQuery: {current_query}\n"
                 if statements:
@@ -175,8 +177,7 @@ class Pipeline:
                 else:
                     previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
 
-                self.append_to_markdown(current_query, statements, search_results, output_path, iteration + 1, self.all_statements)
-                print(f"Iteration {iteration + 1}, Query '{current_query}' appended to {output_path}")
+                print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
 
             # Update metadata for analysis and synthesis
             metadata = self.get_metadata()
@@ -187,11 +188,10 @@ class Pipeline:
                 main_question, previous_queries_and_statements, metadata
             )
             if analysis_and_synthesis:
-                self.append_analysis_and_synthesis_to_markdown(analysis_and_synthesis, output_path, iteration + 1)
+                self.latest_answer = analysis_and_synthesis.get('synthesized_answer', [])
                 previous_analysis = json.dumps(analysis_and_synthesis)
             else:
                 logger.warning(f"Failed to generate analysis and synthesis for iteration {iteration + 1}")
-                self.append_error_to_markdown(output_path, iteration + 1)
                 previous_analysis = ""
 
             # Update metadata for generating next queries
@@ -206,7 +206,9 @@ class Pipeline:
                 break
 
             current_queries = next_queries
-            self.append_next_queries_to_markdown(next_queries[:num_queries], output_path)
+
+            # Generate the HTML report after each iteration
+            self.generate_html_report()
 
         print("Query loop completed.")
 
@@ -216,85 +218,91 @@ class Pipeline:
             "trace_id": self.trace_id,
             "trace_user_id": "Klim",
             "session_id": self.session_id,
-            "generation_name_suffix": ""  # Add this line
+            "generation_name_suffix": ""
         }
 
-    @staticmethod
-    def append_next_queries_to_markdown(next_queries: List[str], filepath: str) -> None:
-        with open(filepath, 'a') as f:
-            f.write("\n## Next Queries\n\n")
-            for idx, query in enumerate(next_queries, 1):
-                f.write(f"{idx}. {query}\n")
-            f.write("\n")
+    def get_snippet_text(self, snippet_id: str, search_results: dict) -> str:
+        if snippet_id.startswith('S'):
+            return self.all_statements.get(snippet_id, "Statement text not found")
+        for result in search_results.get('results', []):
+            if result.get('id') == snippet_id:
+                return result.get('text', '')
+        return f"Snippet text not found for ID: {snippet_id}"
 
-    @staticmethod
-    def append_to_markdown(query: str, statements: List[dict], search_results: dict, filepath: str, iteration: int, all_statements: dict) -> None:
-        def get_snippet_text(snippet_id: str) -> str:
-            if snippet_id.startswith('S'):
-                statement_text = all_statements.get(snippet_id, "Statement text not found")
-                return f"[Previous statement {snippet_id}]: {statement_text}"
-            for result in search_results.get('results', []):
-                if result.get('id') == snippet_id:
-                    return result.get('text', '')
-            return f"Snippet text not found for ID: {snippet_id}"
+    def generate_html_report(self) -> None:
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{self.main_question}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                h1 {{ color: #333; }}
+                table {{ border-collapse: collapse; width: 100%; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+            </style>
+        </head>
+        <body>
+            <h1>{self.main_question}</h1>
+            <h2>Latest Available Answer</h2>
+            {self.generate_latest_answer_html()}
+            <h2>Support Table</h2>
+            {self.generate_support_table_html()}
+        </body>
+        </html>
+        """
 
-        with open(filepath, 'a') as f:
-            f.write(f"\n## Iteration {iteration}\n\n")
-            f.write(f"### Query\n\n{query}\n\n")
-            f.write("### Generated Statements\n\n")
-            for idx, statement in enumerate(statements, 1):
-                f.write(f"#### Statement {idx} (ID: {statement['id']})\n\n")
-                f.write(f"**Statement:** {statement['text']}\n\n")
-                f.write(f"**Evidence:**\n")
-                for evidence in statement['evidence']:
-                    snippet_text = get_snippet_text(evidence)
-                    f.write(f"- {evidence}: {snippet_text}\n")
-                f.write(f"\n**Support Score:** {statement['support_score']}\n\n")
-                f.write(f"**Explanation:** {statement['explanation']}\n\n")
-                f.write("---\n\n")
+        with open(self.output_path, 'w') as f:
+            f.write(html_content)
 
-            if not statements:
-                f.write(f"\n### Note\n\nNo relevant evidence was found for this query. The research will continue with the next iteration.\n\n")
+    def generate_latest_answer_html(self) -> str:
+        answer_html = "<p>"
+        for sentence in self.latest_answer:
+            support_links = ' '.join([f'<a href="#{s}">[{s}]</a>' for s in sentence['support']])
+            answer_html += f"{sentence['sentence']} {support_links}<br>"
+        answer_html += "</p>"
+        return answer_html
 
-    @staticmethod
-    def append_analysis_and_synthesis_to_markdown(analysis_and_synthesis: dict, filepath: str, iteration: int) -> None:
-        with open(filepath, 'a') as f:
-            f.write(f"\n## Research Analysis and Synthesis (Iteration {iteration})\n\n")
-            
-            f.write("### Critical Analysis\n\n")
-            critical_analysis = analysis_and_synthesis.get('critical_analysis', {})
-            f.write(f"**Overall Assessment:** {critical_analysis.get('overall_assessment', 'N/A')}\n\n")
-            
-            f.write("**Over-explored Areas:**\n")
-            for area in critical_analysis.get('over_explored_areas', []):
-                f.write(f"- {area}\n")
-            f.write("\n")
-            
-            f.write("**Under-explored Areas:**\n")
-            for area in critical_analysis.get('under_explored_areas', []):
-                f.write(f"- {area}\n")
-            f.write("\n")
-            
-            f.write(f"**Evidence Quality:** {critical_analysis.get('evidence_quality', 'N/A')}\n\n")
-            f.write(f"**Next Directions:** {critical_analysis.get('next_directions', 'N/A')}\n\n")
-            f.write(f"**Limitations:** {critical_analysis.get('limitations', 'N/A')}\n\n")
-            
-            f.write("### Best Possible Answer Synthesis\n\n")
-            synthesis = analysis_and_synthesis.get('synthesized_answer', [])
-            for sentence in synthesis:
-                f.write(f"- {sentence['sentence']}\n")
-                f.write(f"  Support: {', '.join(sentence['support'])}\n\n")
+    def generate_support_table_html(self) -> str:
+        table_html = """
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Text</th>
+                <th>Support</th>
+            </tr>
+        """
+        for stmt_id, stmt_text in self.all_statements.items():
+            table_html += f"""
+            <tr id="{stmt_id}">
+                <td>{stmt_id}</td>
+                <td>{stmt_text}</td>
+                <td>{self.get_statement_support(stmt_id)}</td>
+            </tr>
+            """
+        for evidence_id, evidence_text in self.all_evidence.items():
+            table_html += f"""
+            <tr id="{evidence_id}">
+                <td>{evidence_id}</td>
+                <td>{evidence_text}</td>
+                <td>External evidence</td>
+            </tr>
+            """
+        table_html += "</table>"
+        return table_html
 
-    @staticmethod
-    def append_error_to_markdown(filepath: str, iteration: int) -> None:
-        with open(filepath, 'a') as f:
-            f.write(f"\n## Research Analysis and Synthesis (Iteration {iteration})\n\n")
-            f.write("Error: Failed to generate research analysis and synthesis for this iteration.\n\n")
+    def get_statement_support(self, stmt_id: str) -> str:
+        statement = self.all_statements.get(stmt_id)
+        if isinstance(statement, dict):
+            return ', '.join([f'<a href="#{e}">{e}</a>' for e in statement.get('evidence', [])])
+        return "No support found"
 
 if __name__ == "__main__":
-    main_question = "Hodw LLMs affect the freedom of speech in Russia?????!"
-    # main_question = "Can you refer me to  research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
-    # main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media??"
+    main_question = "How do LLMs affect the freedom of speech in Russia?"
+    main_question = "What is the impact of AI on the job market in Guatemala?"
 
     pipeline = Pipeline()
     pipeline.run(main_question=main_question, iterations=2, num_queries=2)
