@@ -233,13 +233,9 @@ class Pipeline:
             if snippet_id.startswith('S'):
                 statement_text = all_statements.get(snippet_id, "Statement text not found")
                 return f"[Previous statement {snippet_id}]: {statement_text}"
-            web_results = search_results.get('web', {}).get('results', [])
-            for result in web_results:
-                if result.get('description', {}).get('id') == snippet_id:
-                    return result['description'].get('text', '')
-                for snippet in result.get('extra_snippets', []):
-                    if snippet.get('id') == snippet_id:
-                        return snippet.get('text', '')
+            for result in search_results.get('results', []):
+                if result.get('id') == snippet_id:
+                    return result.get('text', '')
             return f"Snippet text not found for ID: {snippet_id}"
 
         with open(filepath, 'a') as f:
