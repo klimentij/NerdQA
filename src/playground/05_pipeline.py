@@ -263,7 +263,9 @@ def generate_report(state: PipelineState, config: PipelineConfig):
             for step_name, step_result in steps.items():
                 f.write(f"### {step_name}\n\n")
                 f.write("#### Result\n")
-                if isinstance(step_result, (list, dict, BaseModel)):
+                if step_name == 'filter_statements_step':
+                    f.write("Placeholder step - no filtering applied\n\n")
+                elif isinstance(step_result, (list, dict, BaseModel)):
                     f.write("```json\n" + json.dumps(step_result, indent=2, default=json_serializer) + "\n```\n\n")
                 else:
                     f.write(f"{step_result}\n\n")
@@ -277,7 +279,7 @@ def generate_report(state: PipelineState, config: PipelineConfig):
 def main():
     config = PipelineConfig(
         main_question="How do LLMs affect freedom of speech in Russia",
-        iterations=1,
+        iterations=3,
         queries_per_iteration=1,
     )
     

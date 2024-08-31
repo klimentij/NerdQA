@@ -131,11 +131,29 @@ class LiteLLMProxyWrapper:
             url = f"{cfg['api']['llm']['base']}/chat/completions"
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': f"Bearer {litellm_cfg['general_settings']['master_key']}"
+                'Authorization': f"Bearer {litellm_cfg['general_settings']['master_key']}",
             }
             data = {
                 "model": model,
                 "messages": messages,
+                "metadata": {
+                    "generation_name": "klim-test-generation",  # set langfuse Generation Name
+                    # "generation_id": "gen-id22",                  # set langfuse Generation ID 
+                    # "parent_observation_id": "obs-id9",           # set langfuse Parent Observation ID
+                    # "version":  "test-generation-version",        # set langfuse Generation Version
+                    # "trace_user_id": "user-id2",                  # set langfuse Trace User ID
+                    # "session_id": "session-1",                    # set langfuse Session ID
+                    # "tags": ["tag1", "tag2"],                     # set langfuse Tags
+                    # "trace_name": "new-trace-name",               # set langfuse Trace Name
+                    "trace_id": "trace-id22"    ,                     # set langfuse Trace ID
+                    # "trace_metadata": {"key": "value"},           # set langfuse Trace Metadata
+                    # "trace_version": "test-trace-version",        # set langfuse Trace Version (if not set, defaults to Generation Version)
+                    # "trace_release": "test-trace-release",        # set langfuse Trace Release
+                    # # OR
+                    # "existing_trace_id": "trace-id22",            # if generation is continuation of past trace. This prevents default behaviour of setting a trace name
+                    # OR enforce that certain fields are trace overwritten in the trace during the continuation
+                    
+                }
             }
             data.update(kwargs)
 

@@ -8,5 +8,5 @@ from src.util.env_util import cfg
 import subprocess
 
 # Run the litellm command
-subprocess.run(["litellm", "--config", "config/litellm.yml"])
+subprocess.run(["litellm", "--config", "config/litellm.yml", "--debug"])
 

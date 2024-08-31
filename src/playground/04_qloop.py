@@ -2,7 +2,8 @@ import json
 import os
 import re
 import sys
-import hashlib
+import datetime
+import time
 from typing import List, Tuple, Optional
 
 os.chdir(__file__.split('src/')[0])
@@ -21,7 +22,7 @@ class StatementGenerator:
         self.web_search = BraveSearchClient()
         self.skill = Completion(('QLoop', 'Statements'))
 
-    def generate_statements(self, main_question: str, current_query: str, previous_queries_and_statements: str) -> Tuple[List[dict], dict]:
+    def generate_statements(self, main_question: str, current_query: str, previous_queries_and_statements: str, metadata: dict) -> Tuple[List[dict], dict]:
         logger.info(f"Generating statements for query: {current_query}")
         
         search_results = self.web_search.search(current_query)
@@ -32,7 +33,8 @@ class StatementGenerator:
                 "QUERY": current_query,
                 "SEARCH_RESULTS": json.dumps(search_results),
                 "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements
-            }
+            },
+            completion_kwargs={"metadata": metadata}
         )
 
         try:
@@ -59,7 +61,7 @@ class QueryGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Query'))
 
-    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, previous_analysis: str, num_queries: int) -> List[str]:
+    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, previous_analysis: str, num_queries: int, metadata: dict) -> List[str]:
         logger.info(f"Generating next {num_queries} queries")
         
         result = self.skill.complete(
@@ -68,7 +70,8 @@ class QueryGenerator:
                 "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements,
                 "PREVIOUS_ANALYSIS": previous_analysis,
                 "NUM_QUERIES": num_queries
-            }
+            },
+            completion_kwargs={"metadata": metadata}
         )
 
         try:
@@ -90,14 +93,15 @@ class AnswerGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Answer'))
 
-    def generate_analysis_and_synthesis(self, main_question: str, research_history: str) -> dict:
+    def generate_analysis_and_synthesis(self, main_question: str, research_history: str, metadata: dict) -> dict:
         logger.info("Generating research analysis and synthesis")
         
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
                 "RESEARCH_HISTORY": research_history
-            }
+            },
+            completion_kwargs={"metadata": metadata}
         )
 
         try:
@@ -125,8 +129,15 @@ class Pipeline:
         self.query_generator = QueryGenerator()
         self.answer_generator = AnswerGenerator()
         self.all_statements = {}  # Dictionary to store all statements
+        self.pipeline_start_ts = int(time.time())
+        self.trace_id = f"T{self.pipeline_start_ts}"
+        self.session_id = f"S{self.pipeline_start_ts}"
+        self.main_question = ""
+        self.metadata = {}
 
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
+        self.main_question = main_question
+        self.metadata = self.get_metadata()
         current_queries = [main_question]
         previous_queries_and_statements = ""
         previous_analysis = ""
@@ -144,7 +155,9 @@ class Pipeline:
         for iteration in range(iterations):
             # Process only num_queries queries
             for current_query in current_queries[:num_queries]:
-                statements, search_results = self.statement_generator.generate_statements(main_question, current_query, previous_queries_and_statements)
+                statements, search_results = self.statement_generator.generate_statements(
+                    main_question, current_query, previous_queries_and_statements, self.metadata
+                )
                 
                 # Store all generated statements
                 for stmt in statements:
@@ -161,7 +174,9 @@ class Pipeline:
                 print(f"Iteration {iteration + 1}, Query '{current_query}' appended to {output_path}")
 
             # Generate research analysis and synthesis
-            analysis_and_synthesis = self.answer_generator.generate_analysis_and_synthesis(main_question, previous_queries_and_statements)
+            analysis_and_synthesis = self.answer_generator.generate_analysis_and_synthesis(
+                main_question, previous_queries_and_statements, self.metadata
+            )
             if analysis_and_synthesis:
                 self.append_analysis_and_synthesis_to_markdown(analysis_and_synthesis, output_path, iteration + 1)
                 previous_analysis = json.dumps(analysis_and_synthesis)
@@ -170,7 +185,9 @@ class Pipeline:
                 self.append_error_to_markdown(output_path, iteration + 1)
                 previous_analysis = ""
 
-            next_queries = self.query_generator.generate_next_queries(main_question, previous_queries_and_statements, previous_analysis, num_queries)
+            next_queries = self.query_generator.generate_next_queries(
+                main_question, previous_queries_and_statements, previous_analysis, num_queries, self.metadata
+            )
             if not next_queries:
                 logger.error("Failed to generate next queries. Stopping the pipeline.")
                 break
@@ -179,6 +196,14 @@ class Pipeline:
             self.append_next_queries_to_markdown(next_queries[:num_queries], output_path)
 
         print("Query loop completed.")
+
+    def get_metadata(self) -> dict:
+        return {
+            "trace_name": self.main_question[:30],
+            "trace_id": self.trace_id,
+            "trace_user_id": "Klim",
+            "session_id": self.session_id,
+        }
 
     @staticmethod
     def append_next_queries_to_markdown(next_queries: List[str], filepath: str) -> None:
@@ -257,9 +282,9 @@ class Pipeline:
             f.write("Error: Failed to generate research analysis and synthesis for this iteration.\n\n")
 
 if __name__ == "__main__":
-    main_question = "How LLMs affect the freedom of speech in Russia?"
-    # main_question = "Can you refer me to research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
+    main_question = "fdHowd LLMs affect the freedom of speech in Russia?????"
+    main_question = "Can you refer me to  research that adapts the concept of Word Mover's Distance to sentences, addressing the limitations of bag-of-words approaches and considering the order of words for text similarity?"
     # main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media??"
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=2, num_queries=1)
+    pipeline.run(main_question=main_question, iterations=1, num_queries=1)

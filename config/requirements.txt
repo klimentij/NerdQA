@@ -5,3 +5,4 @@ psycopg==3.2.1
 psycopg-binary==3.2.1
 psycopg-pool==3.2.2
 supabase==2.7.3
+langfuse>=2.0.0

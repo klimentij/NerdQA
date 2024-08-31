@@ -393,10 +393,20 @@ class Completion:
             messages: Optional[List[Dict]] = None, # non-batch only!
             doc_placeholders = False,
             mock: bool = False, 
+            completion_kwargs: Optional[Dict] = None,
             ) -> Union[Response, List[Response]]:
         """
         Performs actual the completion.
         """
+        # Update completion_kwargs
+        self.completion_kwargs.update(completion_kwargs or {})
+
+        # Ensure metadata exists in completion_kwargs   
+        if 'metadata' not in self.completion_kwargs:
+            self.completion_kwargs['metadata'] = {}
+        
+        # Always set the generation_name in metadata
+        self.completion_kwargs['metadata']['generation_name'] = '/'.join(self.skill)
 
         if doc_placeholders:
             self.doc_placeholders = doc_placeholders
