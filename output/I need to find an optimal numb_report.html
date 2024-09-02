@@ -1,0 +1,255 @@
+
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>I need to find an optimal number of meals a day based on scientific evidence. Weight 80 kg, 34 y.o., 180 cm, train 3 times a week with some weights. I'd prefer less time on the kitchen, but more time for life and fun</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+                h1 { color: #333; }
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .nav-buttons { margin-bottom: 20px; }
+                .nav-buttons button { margin-right: 10px; }
+            </style>
+            <script>
+                const answers = ["<p><strong>Optimal Number of Meals Per Day for Health and Lifestyle</strong></p>\n<p><strong>Meal Frequency and Health Risks:</strong><br />\n- Higher meal frequencies (\u22656 meals/day) are associated with increased disease risk compared to lower frequencies (1-2 meals/day) <a href=\"#S4163763200\">[S4163763200]</a>.  </p>\n<p><strong>Impact on Lean Mass and Metabolism:</strong><br />\n- The number of meals consumed per day does not significantly impact lean mass or metabolic rate in individuals with a healthy BMI or those who are overweight <a href=\"#S7007758230\">[S7007758230]</a>.  </p>\n<p><strong>Weight Management Considerations:</strong><br />\n- The relationship between eating frequency and weight management is unclear, with current evidence suggesting that increased meal frequency may not be beneficial for weight control <a href=\"#S1152642877\">[S1152642877]</a>.  </p>\n<p><strong>Conclusion:</strong><br />\nBased on the current evidence, consuming fewer meals (1-2 meals per day) may be preferable for health, as higher frequencies could pose risks. Additionally, meal frequency does not significantly affect lean mass or metabolism, and its role in weight management remains uncertain. For someone who prefers to spend less time in the kitchen, a lower meal frequency could align well with lifestyle preferences.</p>", "<p><strong>Optimal Meal Frequency for Active Individuals</strong></p>\n<p><strong>General Recommendations:</strong><br />\n- Higher meal frequencies (\u22656 meals/day) are associated with increased disease risk compared to lower frequencies (1-2 meals/day) <a href=\"#S4163763200\">[S4163763200]</a>.<br />\n- The number of meals consumed per day does not significantly impact lean mass or metabolic rate in individuals with a healthy BMI or those who are overweight <a href=\"#S7007758230\">[S7007758230]</a>.<br />\n- Increased meal frequency may not be beneficial for weight control <a href=\"#S1152642877\">[S1152642877]</a>.  </p>\n<p><strong>Meal Frequency for Active Individuals:</strong><br />\n- Eating 4 or more times a day is associated with a lower risk of obesity and better cholesterol levels, suggesting that higher meal frequency may be beneficial for active individuals <a href=\"#S7769978737\">[S7769978737]</a>.<br />\n- Three larger meals per day may be more beneficial for busy individuals, as they are associated with a greater intake of vegetables and whole grains <a href=\"#S4019629281\">[S4019629281]</a>.<br />\n- Higher meal frequency may help manage insulin levels and support metabolic health in active individuals <a href=\"#S8583131785\">[S8583131785]</a>.  </p>\n<p><strong>Meal Planning for Health and Convenience:</strong><br />\n- Meal planning is an effective strategy for optimizing health and convenience, as it saves time and money while promoting healthier eating habits <a href=\"#S9581775103\">[S9581775103]</a>.<br />\n- For busy individuals, planning three larger meals per day may be more beneficial, as it allows for better adherence to nutritional guidelines and improved diet quality <a href=\"#S0804498907\">[S0804498907]</a>.<br />\n- Higher meal frequency may support metabolic health and help manage insulin levels, making it a viable option for active individuals seeking to optimize their meal planning <a href=\"#S3272368629\">[S3272368629]</a>.  </p>\n<p><strong>Conclusion:</strong><br />\nFor an active individual weighing 80 kg, training three times a week, and preferring less time in the kitchen, a meal frequency of three larger meals per day is recommended. This approach balances health benefits with convenience, allowing for a nutritious diet while maximizing time for other activities.</p>"];
+                let currentIndex = 1;  // Start with the last answer
+
+                function showAnswer(index) {
+                    if (index >= 0 && index < answers.length) {
+                        document.getElementById('answer-content').innerHTML = answers[index];
+                        document.getElementById('current-answer-index').textContent = `Answer ${index + 1} of ${answers.length}`;
+                        
+                        document.getElementById('prev-btn').disabled = (index === 0);
+                        document.getElementById('next-btn').disabled = (index === answers.length - 1);
+                        currentIndex = index;
+                    }
+                }
+
+                window.onload = function() {
+                    showAnswer(currentIndex);  // Show the last answer on page load
+                };
+            </script>
+        </head>
+        <body>
+            <h1>I need to find an optimal number of meals a day based on scientific evidence. Weight 80 kg, 34 y.o., 180 cm, train 3 times a week with some weights. I'd prefer less time on the kitchen, but more time for life and fun</h1>
+            <h2>Generated Answers</h2>
+            <div class="nav-buttons">
+                <button id="prev-btn" onclick="showAnswer(currentIndex - 1)">Previous</button>
+                <span id="current-answer-index">Answer 2 of 2</span>
+                <button id="next-btn" onclick="showAnswer(currentIndex + 1)">Next</button>
+            </div>
+            <div id="answer-content"></div>
+            <h2>Support Table</h2>
+            
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Text</th>
+                <th>Support</th>
+            </tr>
+        
+            <tr id="S4163763200">
+                <td>S4163763200</td>
+                <td>{'evidence': ['E8656965005', 'E7342257277', 'E2464799038'], 'explanation': 'The evidence indicates that higher meal frequencies (≥6 meals/day) are associated with a significant increase in disease risk compared to lower frequencies (1-2 meals/day), as noted in the study findings from the Adventist Health Study 2, which highlights the potential health risks of frequent eating patterns.', 'text': 'Higher meal frequencies (≥6 meals/day) are associated with increased disease risk compared to lower frequencies (1-2 meals/day).', 'support_score': 0.95, 'id': 'S4163763200'}</td>
+                <td><a href="#E8656965005">E8656965005</a>, <a href="#E7342257277">E7342257277</a>, <a href="#E2464799038">E2464799038</a></td>
+            </tr>
+            
+            <tr id="S7007758230">
+                <td>S7007758230</td>
+                <td>{'evidence': ['E7545809766', 'E7306147394', 'E9081314999'], 'explanation': 'Research shows that the number of meals consumed per day does not significantly impact lean mass in both overweight individuals and those with a healthy BMI. Studies indicate that there is no difference in metabolic rate when comparing various meal frequencies, suggesting that meal frequency may not be a critical factor for muscle retention in individuals who lift weights.', 'text': 'The number of meals consumed per day does not significantly impact lean mass or metabolic rate in individuals with a healthy BMI or those who are overweight.', 'support_score': 0.92, 'id': 'S7007758230'}</td>
+                <td><a href="#E7545809766">E7545809766</a>, <a href="#E7306147394">E7306147394</a>, <a href="#E9081314999">E9081314999</a></td>
+            </tr>
+            
+            <tr id="S1152642877">
+                <td>S1152642877</td>
+                <td>{'evidence': ['E8903350741', 'E8793999422', 'E7571942366'], 'explanation': 'The systematic review indicates that while increased eating frequency (grazing) is often suggested for weight management, the scientific community agrees that the relationship between eating frequency and weight management is not clear, and more research is needed to establish optimal eating patterns for weight control.', 'text': 'The relationship between eating frequency and weight management is unclear, with current evidence suggesting that increased meal frequency may not be beneficial for weight control.', 'support_score': 0.9, 'id': 'S1152642877'}</td>
+                <td><a href="#E8903350741">E8903350741</a>, <a href="#E8793999422">E8793999422</a>, <a href="#E7571942366">E7571942366</a></td>
+            </tr>
+            
+            <tr id="S7769978737">
+                <td>S7769978737</td>
+                <td>{'evidence': ['E5204594172', 'E2625460739', 'E7444829782', 'E8585138444'], 'explanation': 'Research indicates that individuals who eat 4 or more times a day have a significantly lower risk of obesity compared to those who eat 3 or fewer times a day, as shown in the SEASONS study (E7444829782). Additionally, a large cross-sectional study found that those eating ≥6 times a day had lower total and LDL cholesterol levels compared to those eating 1 or 2 times a day (E8585138444). This suggests that higher meal frequency may be beneficial for maintaining a healthy weight and cholesterol levels, which is important for active individuals.', 'text': 'Eating 4 or more times a day is associated with a lower risk of obesity and better cholesterol levels, suggesting that higher meal frequency may be beneficial for active individuals.', 'support_score': 0.95, 'id': 'S7769978737'}</td>
+                <td><a href="#E5204594172">E5204594172</a>, <a href="#E2625460739">E2625460739</a>, <a href="#E7444829782">E7444829782</a>, <a href="#E8585138444">E8585138444</a></td>
+            </tr>
+            
+            <tr id="S4019629281">
+                <td>S4019629281</td>
+                <td>{'evidence': ['E6567156631', 'E7209815368', 'E4538309413'], 'explanation': 'The evidence indicates that individuals who consume three larger meals per day are more likely to have a greater intake of vegetables and whole grains, which can be beneficial for health (E7209815368). This aligns with the idea that busy individuals may benefit from fewer, larger meals that are nutrient-dense, as they may not have time to prepare multiple smaller meals throughout the day (E4538309413).', 'text': 'Three larger meals per day may be more beneficial for busy individuals, as they are associated with a greater intake of vegetables and whole grains.', 'support_score': 0.92, 'id': 'S4019629281'}</td>
+                <td><a href="#E6567156631">E6567156631</a>, <a href="#E7209815368">E7209815368</a>, <a href="#E4538309413">E4538309413</a></td>
+            </tr>
+            
+            <tr id="S8583131785">
+                <td>S8583131785</td>
+                <td>{'evidence': ['E1150252238', 'E0520885766', 'E7922385272'], 'explanation': 'The evidence suggests that higher meal frequency (nibbling) can reduce insulin concentrations compared to three meals daily, which may help in managing weight and metabolic health (E1150252238). This is particularly relevant for active individuals who need to maintain energy levels without excessive insulin spikes. Additionally, meal timing and frequency can influence metabolic responses, indicating that meal frequency should be tailored to individual activity levels (E0520885766).', 'text': 'Higher meal frequency may help manage insulin levels and support metabolic health in active individuals, making it a viable option for those with busy schedules.', 'support_score': 0.93, 'id': 'S8583131785'}</td>
+                <td><a href="#E1150252238">E1150252238</a>, <a href="#E0520885766">E0520885766</a>, <a href="#E7922385272">E7922385272</a></td>
+            </tr>
+            
+            <tr id="S9581775103">
+                <td>S9581775103</td>
+                <td>{'evidence': ['E5548696876', 'E8999324871', 'E7988333799', 'E7915567389', 'S7769978737'], 'explanation': 'The evidence states that regular meal planning can save time and money, make it easier to eat healthy foods, and help manage health conditions. Specifically, it mentions that meal planning can lead to healthier eating habits and reduce reliance on fast food, which aligns with the idea that planning meals in advance can optimize health and convenience. Additionally, it supports the notion that higher meal frequency may be beneficial for active individuals, as indicated in previous statements.', 'text': 'Meal planning is an effective strategy for optimizing health and convenience, as it saves time and money while promoting healthier eating habits.', 'support_score': 0.95, 'id': 'S9581775103'}</td>
+                <td><a href="#E5548696876">E5548696876</a>, <a href="#E8999324871">E8999324871</a>, <a href="#E7988333799">E7988333799</a>, <a href="#E7915567389">E7915567389</a>, <a href="#S7769978737">S7769978737</a></td>
+            </tr>
+            
+            <tr id="S0804498907">
+                <td>S0804498907</td>
+                <td>{'evidence': ['E5548696876', 'E8999324871', 'E6761855308', 'S4019629281'], 'explanation': 'The evidence indicates that meal planning can help individuals manage their dietary needs and preferences, which is particularly beneficial for busy individuals. It highlights that planning meals can lead to better adherence to nutritional guidelines and improved diet quality, supporting the idea that three larger meals per day may be more beneficial for busy individuals.', 'text': 'For busy individuals, planning three larger meals per day may be more beneficial, as it allows for better adherence to nutritional guidelines and improved diet quality.', 'support_score': 0.92, 'id': 'S0804498907'}</td>
+                <td><a href="#E5548696876">E5548696876</a>, <a href="#E8999324871">E8999324871</a>, <a href="#E6761855308">E6761855308</a>, <a href="#S4019629281">S4019629281</a></td>
+            </tr>
+            
+            <tr id="S3272368629">
+                <td>S3272368629</td>
+                <td>{'evidence': ['E5548696876', 'E7915567389', 'E6761855308', 'S8583131785'], 'explanation': 'The evidence suggests that meal planning can significantly enhance dietary habits by reducing food waste and promoting healthier choices. It also indicates that higher meal frequency may help manage insulin levels and support metabolic health, which is relevant for active individuals looking to optimize their meal planning.', 'text': 'Higher meal frequency may support metabolic health and help manage insulin levels, making it a viable option for active individuals seeking to optimize their meal planning.', 'support_score': 0.9, 'id': 'S3272368629'}</td>
+                <td><a href="#E5548696876">E5548696876</a>, <a href="#E7915567389">E7915567389</a>, <a href="#E6761855308">E6761855308</a>, <a href="#S8583131785">S8583131785</a></td>
+            </tr>
+            
+            <tr id="E8656965005">
+                <td>E8656965005</td>
+                <td>The influence of meal frequency and timing on health and disease has been a topic of interest for many years. While epidemiological evidence indicates an association between higher meal frequencies and lower disease risk, experimental trials have shown ... The influence of meal frequency and timing on health and disease has been a topic of interest for many years. While epidemiological evidence indicates an association between higher meal frequencies and lower disease risk, experimental trials have shown conflicting results. Furthermore, recent prospective research has demonstrated a significant increase in disease risk with a high meal frequency (≥6 meals/day) as compared to a low meal frequency (1–2 meals/day). Food timing that is out of sync with light/dark cues could induce higher caloric intake due to impaired satiety mechanisms through leptin and ghrelin [79]. Even other hormones involved in metabolism control are affected by circadian misalignment as thyroid hormones [80]. ... Alteration of gene expression in genes that are associated with evening eating preference and weight loss resistance e.g.,SIRT1, CLOCK 3111T/C, and Perilipin1 [81,82] The results confirmed the positive effects of consuming more calories earlier in the day, including through breakfast consumption, and the correlation between meal timing and body weight. However, it should be noted that some evidence has failed to support the importance of breakfast consumption for body weight change in free-living adults. Dhurandhar et al. [62] conducted a randomized controlled trial that assigned 309 overweight and obese adults to either eat breakfast or skip breakfast for 16 weeks. The results showed no differences during the day whilst night expenditure was significantly higher with two meals compared with six meals [34]. On the contrary, other studies demonstrated a significantly higher basal energy expenditure in the morning compared to the evening [35,36,37]. However, diurnal differences in the total energy expenditure are not consistently found in all studies [38]. Other studies suggest that weight gain and its metabolic consequences with a higher meal frequency are due to not only to the higher sugar derived energy intake [39] and associated metabolic issues, but also to increased food stimuli, hunger and desire to eat [40,41]. Thus, a regular meals pattern has potential positive effects on health outcomes regardless of meal frequency.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7342257277">
+                <td>E7342257277</td>
+                <td>The influence of meal frequency and timing on health and disease has been a topic of interest for many years. While epidemiological evidence indicates an association between higher meal frequencies and lower disease risk, experimental trials have shown conflicting results. Furthermore, recent prospective research has demonstrated a significant increase in disease risk with a high meal frequency (≥6 meals/day) as compared to a low meal frequency (1–2 meals/day).</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E2464799038">
+                <td>E2464799038</td>
+                <td>Snippet text not found for ID: E2464799038</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7545809766">
+                <td>E7545809766</td>
+                <td>Fitness fanatics and gurus love to debate about meal frequency, but are more or fewer meals really better for how often should you really eat to spurring muscle growth or fat loss? Find out here! Looking at studies lasting anywhere from 2-8 weeks, for both overweight individuals and individuals with a healthy BMI, it doesn't appear that the number of meals consumed per day has a significant impact on lean mass. Based on these studies, it doesn't appear that meal frequency has an effect on muscle mass. However, it should be noted that the previously mentioned studies were not done in athletes who regularly lift weights. After two weeks, there was greater muscle retention with six meals a day.[16] It should be noted here that calorie intake was only 1,200 calories a day and protein intake was only 60 grams a day (roughly 0.45 grams per pound of body weight), both of which are far lower than most males who are dieting with the goal of muscle retention. However, can increasing the number of times you eat each day really speed up your metabolic rate and help with weight loss? When consuming the same total calories split between two versus six meals, one versus three versus five meals, or two versus 3-5 meals, there was no difference in metabolic rate in overweight or obese individuals. When consuming the same total calories split between two versus six meals, one versus three versus five meals, or two versus 3-5 meals, there was no difference in metabolic rate in overweight or obese individuals.[1-2] Furthermore, no difference in metabolic rate was seen between consuming 2 or 7 meals daily in participants of a healthy weight.[4]</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7306147394">
+                <td>E7306147394</td>
+                <td>Looking at studies lasting anywhere from 2-8 weeks, for both overweight individuals and individuals with a healthy BMI, it doesn't appear that the number of meals consumed per day has a significant impact on lean mass. Based on these studies, it doesn't appear that meal frequency has an effect on muscle mass. However, it should be noted that the previously mentioned studies were not done in athletes who regularly lift weights.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E9081314999">
+                <td>E9081314999</td>
+                <td>When consuming the same total calories split between two versus six meals, one versus three versus five meals, or two versus 3-5 meals, there was no difference in metabolic rate in overweight or obese individuals.[1-2] Furthermore, no difference in metabolic rate was seen between consuming 2 or 7 meals daily in participants of a healthy weight.[4]</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E8903350741">
+                <td>E8903350741</td>
+                <td>Eating frequently during the day, or “grazing,” has been proposed to assist with managing food intake and weight. This systematic review assessed the effect of greater eating frequency (EF) on intake and anthropometrics in human and animal ... Out of the five studies conducted in field settings, three used a randomized crossover design (22, 31–34). For the 5 studies, the number of eating occasions in the EF manipulations varied greatly, ranging from 1 to 12 eating occasions per day, intervention length ranged from 1 to 8.5 weeks, and sample size per condition ranged from 4 to 15 participants (22, 31–34). 34. Stote KS, Baer DJ, Spears K, Paul DR, Harris GK, Rumpler WV, et al. A controlled trial of reduced meal frequency without caloric restriction in healthy, normal-weight, middle-aged adults. Am J Clin Nutr (2007) 85:981–8. [PMC free article] [PubMed] [Google Scholar] 35. Anderson TA, Raffety CJ, Birkhofer KK, Fomon SJ. Effect of feeding frequency on growth and body composition of gastrostomized rat pups. J Nutr (1980) 110:2374–80. J Anim Sci (2002) 80:1545–55./2002.8061545x [PubMed] [Google Scholar] 39. Vicari T, van den Borne JJ, Gerrits WJ, Zbinden Y, Blum JW. Postprandial blood hormone and metabolite concentrations influenced by feeding frequency and feeding level in veal calves. Domest Anim Endocrinol (2008) 34:74–88. One dietary strategy that has long been proposed in the lay literature to improve appetite control and assist with weight management is increased eating frequency (EF) (i.e., eat small amounts of food every 2–3 h – “grazing”) (8, 9). However, while “grazing” is often suggested as a helpful strategy for managing hunger, the Dietary Guidelines Committee of 2010 stated that there is a lack of research in the area on EF and body weight and obesity, thus conclusions regarding an optimum EF prescription for weight management cannot be made and research on this topic is greatly needed (10). Therefore, within the scientific community there is agreement that the relationship between EF and management of food intake and weight is not clear (10).</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E8793999422">
+                <td>E8793999422</td>
+                <td>Eating frequently during the day, or “grazing,” has been proposed to assist with managing food intake and weight. This systematic review assessed the effect of greater eating frequency (EF) on intake and anthropometrics in human and animal ...</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7571942366">
+                <td>E7571942366</td>
+                <td>Although major research efforts have focused on how specific components of foodstuffs affect health, relatively little is known about a more fundamental aspect of diet, the frequency and circadian timing of meals, and potential benefits of intermittent ... Examples of such prescriptions include fasting or caloric restriction (e.g., 500 calories) on alternate days or 2 d each week, or forgoing breakfast and lunch several days each week (Fig. 3). The available evidence suggests that patients may be able to comply with such diets when there is rigorous follow-up (44, 45, 47), and it will be important to determine if compliance would increase further if patients were able to choose an eating pattern-based prescription that best fits their weekly routines. Recent findings suggest that it may be possible for many people to adopt a long-term change in their lifestyle from eating three meals plus snacks every day to an IER diet if they are able to keep on the new eating pattern during a transition period of approximately 1 mo (45). Thus, far, relatively few RCTs of IER and TRF have been performed in human subjects, with the results of several studies of alternate-day and twice weekly energy restriction demonstrating weight loss and abdominal fat reduction and suggesting improvements in indicators of energy and lipid metabolism and inflammation (44–46, 51, 61). On the other hand, a study of TRF in which healthy normal weight subjects consumed a balanced daily food intake within a 4-h or 12-h time period each day revealed no improvement (79, 80), which is similar to the lack of any short-term benefit of TRF in mice when the animals are fed a balanced diet (23). Unfortunately, the common knowledge that reducing overall calorie intake and regular exercise can help optimize body weight and reduce disease risk has, in many cases, not been implemented successfully. Some of the advice provided by physicians and dieticians to their patients is consistent with the current scientific evidence, including the benefits of vegetables, fruits, fiber, nuts, and fish, and the value of reducing or eliminating snacks. Humans are highly heterogeneous with regard to their genetic composition, epigenetic landscape, and the environmental factors to which they are exposed throughout life. It is therefore likely that there will be considerable variability among human subjects in the responses of their cells and organ systems (and overall health) to different eating patterns. Although there is sufficient evidence to suggest that CR and IER can improve health indicators in most or all obese human subjects (2), data are lacking with regard to normal weight subjects.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E5204594172">
+                <td>E5204594172</td>
+                <td>The influence of meal frequency and timing on health and disease has been a topic of interest for many years. While epidemiological evidence indicates an association between higher meal frequencies and lower disease risk, experimental trials have shown ... In order to reconcile these two strategies, an individual could eat from breakfast until mid- to late-afternoon each day (Figure 3). However, it should be considered that this style of eating may not be desirable or feasible for many individuals, as it represents a paradigm shift from traditional eating patterns in many parts of the world. ... Effects of different meals timing and frequency on different variables. At the centre of the picture the reciprocal influences of brain, heart and gut was showed. AMPK: AMP-activated protein kinase. In these experiments, animals in the ad lib diet have unrestricted access to food, not only in quantity but also in frequency, whilst the CR group can only eat within a specific window, usually determined by the researcher’s schedule. In these settings, meals are often spaced out, creating prolonged fasting windows that could influence the outcomes [94]. This is an important issue because fasting is a different approach than traditional CR. In a 1989 paper, authors compared a very high frequency of meals (17) to a lower frequency (3) and found an improvement of total and LDL cholesterol with the higher frequency; however, this particular approach is clearly atypical in ordinary life [12]. A recent study within the European Prospective Investigation into Cancer (EPIC) project showed a lower concentration of total and LDL cholesterol in subjects reporting a higher (≥6 times/day) meal frequency compared to those who ate 1 or 2 times a day, even when adjusted for age, BMI, physical activity, smoking, total energy intake, and macron We now know that insulin activates a key enzyme in cholesterol biosynthesis, hydroxymethylglutaryl-CoA (HMGCoA) reductase (the target for statins) [45]. Even though the discussion about the mechanisms underlying this control (AMP-activated protein kinase, increased rate of transcription, or insulin-induced genes) [46,47,48], exceeds the aims of this review, it appears consequential that an increase in blood glucose and, of consequence, of insulin will lead to increased endogenous cholesterol synthesis [49,50,51]. It was demonstrated that a higher meal frequency (nibbling) reduced insulin concentrations as compared to three meals daily [12], likely caused by a reduction in cholesterol synthesis [29].</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E2625460739">
+                <td>E2625460739</td>
+                <td>In a 1989 paper, authors compared a very high frequency of meals (17) to a lower frequency (3) and found an improvement of total and LDL cholesterol with the higher frequency; however, this particular approach is clearly atypical in ordinary life [12]. A recent study within the European Prospective Investigation into Cancer (EPIC) project showed a lower concentration of total and LDL cholesterol in subjects reporting a higher (≥6 times/day) meal frequency compared to those who ate 1 or 2 times a day, even when adjusted for age, BMI, physical activity, smoking, total energy intake, and macron</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7444829782">
+                <td>E7444829782</td>
+                <td>Eating patterns are increasingly varied. Typical breakfast, lunch, and dinner meals are difficult to distinguish because skipping meals and snacking have become more prevalent. Such eating styles can have various effects on cardiometabolic health markers, ... Exclusion criteria included (1) trials that included dietary supplements, pharmacological substances, or exercise; (2) individuals with type 2 diabetes mellitus; and (3) very active individuals or athletes. This search was limited to clinical trials with human subjects reported in the English language. It is commonly reported that “breakfast is the most important meal of the day.”9 However, ≈20% to 30% of US adults do not eat breakfast, and breakfast consumption has declined in recent decades.10–14 Of all meals, the prevalences of breakfast and lunch consumption have seen the greatest In a cross-sectional analysis within the prospective SEASONS study (Seasonal Variation of Blood Cholesterol Study in Worcester County, Massachusetts; n=499; 50.3% men; mean age, 48 years), individuals who ate ≥4 times a day had a significantly lower risk of obesity (OR, 0.55; 95% CI, 0.33–0.91) compared with individuals who ate ≤3 times a day, after adjustment for age, sex, physical activity, and TEI.48 In the Malmo Diet and Cancer study (n=1355 men, 1654 women; age, 47–68 years), meal frequency was associated with an increased risk of obesity in men but not women.78 Compared with men who ate ≥6 times per day, men who ate ≤3 times a day were more likely to be obese (OR, 2.42; 95% CI, 1.02–5.73) and to have an increased waist circumference (≥102 cm; OR, 2.09; 95% CI, 1.03–4.27) after adjustment for TEI, lifestyle, and diet. In a large, cross-sectional study conducted within the Norfolk cohort of EPIC (European Prospective Investigation Into Cancer; n=14 666; age, 45–75 years), greater frequency of eating was associated with lower mean concentrations of total and LDL cholesterol.79 Individuals who reported eating ≥6 times a day had mean total cholesterol levels that were ≈0.15 mmol/L lower than in individuals who ate 1 or 2 times a day, independently of TEI, age, BMI, smoking, physical activity, and nutrients. Eating frequency was not associated with HDL cholesterol. Among men, infrequent meal frequency was associated with greater risk of type 2 diabetes mellitus over 16 years of follow-up.61 Compared with men who ate 3 meals a day, men who ate 1 to 2 times a day had an HR for diabetes mellitus of 1.26 (95% CI, 1.09–1.46) after adjustment for age, lifestyle, diet, and other potential confounders. The authors concluded that the improvement in IR in the group consuming a large breakfast implies an eating schedule that is synchronized with the circadian pacemaker but that consuming a larger dinner does not worsen IR in these women. This beneficial effect of a larger breakfast on the cardiometabolic risk profile is not universally observed, however. During Ramadan fasting, individuals eat breakfast 30 minutes before sunrise and eat dinner after sunset.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E8585138444">
+                <td>E8585138444</td>
+                <td>Eating patterns are increasingly varied. Typical breakfast, lunch, and dinner meals are difficult to distinguish because skipping meals and snacking have become more prevalent. Such eating styles can have various effects on cardiometabolic health markers, ...</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E6567156631">
+                <td>E6567156631</td>
+                <td>The influence of meal frequency and timing on health and disease has been a topic of interest for many years. While epidemiological evidence indicates an association between higher meal frequencies and lower disease risk, experimental trials have shown ...</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7209815368">
+                <td>E7209815368</td>
+                <td>People who may benefit from three larger meals per day include: those who have difficulty practicing portion control ... people who live busy lives and may not have time to plan and prepare several nutritious mini-meals a day.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E4538309413">
+                <td>E4538309413</td>
+                <td>In a large, cross-sectional study conducted within the Norfolk cohort of EPIC (European Prospective Investigation Into Cancer; n=14 666; age, 45–75 years), greater frequency of eating was associated with lower mean concentrations of total and LDL cholesterol.79 Individuals who reported eating ≥6 times a day had mean total cholesterol levels that were ≈0.15 mmol/L lower than in individuals who ate 1 or 2 times a day, independently of TEI, age, BMI, smoking, physical activity, and nutrients. Eating frequency was not associated with HDL cholesterol. Among men, infrequent meal frequency was associated with greater risk of type 2 diabetes mellitus over 16 years of follow-up.61 Compared with men who ate 3 meals a day, men who ate 1 to 2 times a day had an HR for diabetes mellitus of 1.26 (95% CI, 1.09–1.46) after adjustment for age, lifestyle, diet, and other potential confounders.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E1150252238">
+                <td>E1150252238</td>
+                <td>We now know that insulin activates a key enzyme in cholesterol biosynthesis, hydroxymethylglutaryl-CoA (HMGCoA) reductase (the target for statins) [45]. Even though the discussion about the mechanisms underlying this control (AMP-activated protein kinase, increased rate of transcription, or insulin-induced genes) [46,47,48], exceeds the aims of this review, it appears consequential that an increase in blood glucose and, of consequence, of insulin will lead to increased endogenous cholesterol synthesis [49,50,51]. It was demonstrated that a higher meal frequency (nibbling) reduced insulin concentrations as compared to three meals daily [12], likely caused by a reduction in cholesterol synthesis [29].</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E0520885766">
+                <td>E0520885766</td>
+                <td>In order to reconcile these two strategies, an individual could eat from breakfast until mid- to late-afternoon each day (Figure 3). However, it should be considered that this style of eating may not be desirable or feasible for many individuals, as it represents a paradigm shift from traditional eating patterns in many parts of the world. ... Effects of different meals timing and frequency on different variables. At the centre of the picture the reciprocal influences of brain, heart and gut was showed. AMPK: AMP-activated protein kinase.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7922385272">
+                <td>E7922385272</td>
+                <td>Although major research efforts have focused on how specific components of foodstuffs affect health, relatively little is known about a more fundamental aspect of diet, the frequency and circadian timing of meals, and potential benefits of intermittent ... Although major research efforts have focused on how specific components of foodstuffs affect health, relatively little is known about a more fundamental aspect of diet, the frequency and circadian timing of meals, and potential benefits of intermittent periods with no or very low energy intakes. During night-shift work the individuals are subject to both prolonged hours of artificial lighting and an abnormal eating schedule. Furthermore, during the weekend the tendency to maintain a day-active social life imposes a jet-lag–type paradigm in which both central and peripheral clocks attempt to adjust to a weekend lifestyle. Understanding the mechanism of TRF will help to predict whether a certain eating pattern is beneficial or whether individuals with specific genotype are predisposed to erratic eating patterns. Missense mutation in circadian clock component Per1 has been shown to affect eating patterns in mice (21). However, the presence of intact food anticipatory activity in SCN ablated rodents or those lacking functional circadian oscillator genes points to yet-unidentified genes and circuits in eating-pattern determination (82, 83). Not only does circadian phase influence the metabolic response to food intake, food intake itself has recently been demonstrated to be under control by the endogenous circadian system, independent of the sleep/wake and fasting/feeding cycle (32), possibly helping explain why breakfast is often the smallest meal of the day or even skipped all together. Compared with those fed ad libitum, the lifespans of organisms from yeast and worms, to mice and monkeys can be extended by dietary energy restriction (33–35). Data collected from individuals practicing severe dietary restriction indicate that humans undergo many of the same molecular, metabolic, and physiologic adaptations typical of long-lived CR rodents (36).</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E5548696876">
+                <td>E5548696876</td>
+                <td>Regular meal planning can save you time and money, make it easier to eat healthy foods, and help you manage health conditions like diabetes and heart disease. Experts outline how to do it, including different approaches, tools, shopping tips, and recipes to successfully build a weekly menu. Select the meals and snacks you plan to eat for the following week and put them into your calendar. Create a grocery list that includes any ingredients you need to buy, snacks, and convenience items (for example, instant oatmeal or salad kits). Building a menu in advance can save you time and money, and make it easier to eat healthy foods and manage special dietary needs.Stefan Nikolic/Getty Images · Figuring out what to eat every day can be stressful, especially when you’re already juggling a busy schedule that includes work, family, and social obligations. Often, people end up scraping together last-minute meals or throwing in the hat and ordering food delivery. Rest assured there’s a better way to feed yourself and your family: meal planning. There are different types of meal plans. Some may be geared toward managing a specific health condition, such as type 2 diabetes or heart disease. These meal plans are often created with input from a registered dietitian or healthcare provider. For example, people with type 2 diabetes typically follow a diabetes-friendly meal plan to control their blood sugar levels, while people concerned about a family history of heart disease may follow a meal plan focused on heart health.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E8999324871">
+                <td>E8999324871</td>
+                <td>Regular meal planning can save you time and money, make it easier to eat healthy foods, and help you manage health conditions like diabetes and heart disease. Experts outline how to do it, including different approaches, tools, shopping tips, and recipes to successfully build a weekly menu.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7988333799">
+                <td>E7988333799</td>
+                <td>Taking the time to plan your meals for the week ahead is worth the effort. This is why some of us settle for the closest fast food joint with unhealthy options. Meal planning eliminates this issue when you have a balanced meal at your fingertips, filled with nutrient-dense food prepped and ready to go! "Many times unhealthy foods are chosen because of convenience," explains Veri. "If we can take the time out to plan meals, write a grocery list and have fruits, vegetables, whole grains and beans available, they will become convenient and eaten more often." Everyone can agree that saving money is something we all try to do, and meal planning is a great way to help. While you skip out on spending money at restaurants, meal planning also involves buying items in bulk, which can be a huge money saver. Whether you’re trying to lose weight, or just improve your diet, meal planning is an easy step to help you reach your goals.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E7915567389">
+                <td>E7915567389</td>
+                <td>By planning ahead, you can save calories, time, money and decrease the amount of food you waste. By planning ahead, you can save calories, time, money and decrease the amount of food you waste. Meal planning is essentially making a “plan” of what you are going to eat each day. This can include all or one of your daily meals. There are many benefits that come along with meal planning such as eating more nutritious meals while saving time, energy and money. If you do not have time in the morning, try preparing the food the night before, like rice and chicken, to reheat the next day to make a quick, healthy meal. Planning ahead can also incorporate the same food into multiple meals by utilizing leftovers (using leftover meat in a soup for example). Time is saved by having a specific grocery list, cutting out the aimless wandering through aisles. Aimless wandering can lead to a cart full of unessential odds and ends which can cost you greatly at the check-out, meal planning helps eliminate this. The meals that are prepared at home are often more nutritious than ones that might be consumed in a restaurant, adding another positive to meal planning.</td>
+                <td>External evidence</td>
+            </tr>
+            
+            <tr id="E6761855308">
+                <td>E6761855308</td>
+                <td>Chronic diseases such as heart disease, stroke, diabetes, and hypertension are major global health challenges. Healthy eating can help people with chronic diseases manage their condition and prevent complications. However, making healthy meal plans is ... Descriptive explanation of fuzzy membership functions for various nutrients, fuzzy nutrition optimization algorithm, and multiobjective optimization algorithm. ... The data sets analyzed during this study are available from the corresponding author upon reasonable request. Chronic diseases such as heart disease, stroke, diabetes, and hypertension are major global health challenges. Healthy eating can help people with chronic diseases manage their condition and prevent complications. However, making healthy meal plans is not easy, as it requires the consideration of various factors such as health concerns, nutritional requirements, tastes, economic status, and time limits. In Figure 3D, the “Healthy Value” represents the PV value defined previously. To enhance user-friendliness, we used an easily understandable name instead of directly referencing the PV value. The current version of the app was designed to generate meal plans based on a conventional 3-meal structure. This study aimed to design an artificial intelligence (AI)–powered meal planner that can generate personalized healthy meal plans based on the user’s specific health conditions, personal preferences, and status. We proposed a system that integrates semantic reasoning, fuzzy logic, heuristic search, and multicriteria analysis to produce flexible, optimized meal plans based on the user’s health concerns, nutrition needs, as well as food restrictions or constraints, along with other personal preferences. We implemented a mobile app prototype system and evaluated its effectiveness through a use case study and user study. The results showed that the system generated healthy and personalized meal plans that considered the user’s health concerns, optimized nutrition values, respected dietary restrictions and constraints, and met the user’s preferences.</td>
+                <td>External evidence</td>
+            </tr>
+            </table>
+        </body>
+        </html>
+        

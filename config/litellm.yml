@@ -18,7 +18,7 @@ model_list:
     litellm_params: # all params accepted by litellm.completion() - https://docs.litellm.ai/docs/completion/input
       model: gpt-4o-mini ### MODEL NAME sent to `litellm.completion()` ###
       api_key: "os.environ/OPENAI_API_KEY" # does os.getenv
-      rpm: 20      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
+      rpm: 100      # [OPTIONAL] Rate limit for this deployment: in requests per minute (rpm)
       
 litellm_settings:
   num_retries: 3 # retry call 3 times on each model_name (e.g. zephyr-beta)
@@ -27,7 +27,6 @@ litellm_settings:
   allowed_fails: 3 # cooldown model if it fails > 1 call in a minute. 
   success_callback: ["langfuse"]
   redact_user_api_key_info: true
-  langfuse_default_tags: ["cache_hit", "cache_key", "proxy_base_url", "user_api_key_alias", "user_api_key_user_id", "user_api_key_user_email", "user_api_key_team_alias", "semantic-similarity", "proxy_base_url"]
   cache: True
   cache_params:
     type: local

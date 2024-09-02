@@ -1,77 +1,16 @@
 {
   "type": "json_schema",
   "json_schema": {
-    "name": "research_analysis_and_synthesis",
+    "name": "synthesized_answer",
     "schema": {
       "type": "object",
       "properties": {
-        "critical_analysis": {
-          "type": "object",
-          "properties": {
-            "overall_assessment": {
-              "type": "string",
-              "description": "Overall assessment of how well the topic has been explored"
-            },
-            "over_explored_areas": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "List of areas that have been over-explored in the research"
-            },
-            "under_explored_areas": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "List of areas or gaps that are under-explored in the research"
-            },
-            "evidence_quality": {
-              "type": "string",
-              "description": "Evaluation of the quality and relevance of the evidence collected"
-            },
-            "next_directions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Suggestions for the most promising next directions to explore"
-            },
-            "limitations": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Potential biases or limitations in the current research approach"
-            }
-          },
-          "required": ["overall_assessment", "over_explored_areas", "under_explored_areas", "evidence_quality", "next_directions", "limitations"],
-          "additionalProperties": false
-        },
-        "synthesized_answer": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "sentence": {
-                "type": "string",
-                "description": "A sentence in the synthesized answer"
-              },
-              "support": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "List of statement IDs (S...) or evidence IDs (E...) that fully support the sentence"
-              }
-            },
-            "required": ["sentence", "support"],
-            "additionalProperties": false
-          },
-          "description": "Array of sentence objects representing the best possible answer synthesized from existing statements"
+        "answer": {
+          "type": "string",
+          "description": "The best possible answer synthesized from existing statements and evidence"
         }
       },
-      "required": ["critical_analysis", "synthesized_answer"],
+      "required": ["answer"],
       "additionalProperties": false
     },
     "strict": true

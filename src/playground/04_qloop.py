@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import time
 from typing import List, Tuple, Optional
+import markdown
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -94,8 +95,8 @@ class AnswerGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Answer'))
 
-    def generate_analysis_and_synthesis(self, main_question: str, research_history: str, metadata: dict) -> dict:
-        logger.info("Generating research analysis and synthesis")
+    def generate_answer(self, main_question: str, research_history: str, metadata: dict) -> str:
+        logger.info("Generating research answer")
         
         result = self.skill.complete(
             prompt_inputs={
@@ -106,44 +107,41 @@ class AnswerGenerator:
         )
 
         try:
-            # Check if the result has the expected structure
             if not result.content:
                 logger.error("Empty response from LLM")
-                return {}
+                return ""
 
             response_data = json.loads(result.content)
-            logger.info("Generated research analysis and synthesis")
-            return response_data
+            answer = response_data.get('answer', '')
+            logger.info("Generated research answer")
+            return answer
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
-            return {}
-        except AttributeError as e:
-            logger.error(f"Unexpected response structure: {e}")
-            return {}
+            return ""
         except Exception as e:
-            logger.error(f"Unexpected error in generate_analysis_and_synthesis: {e}")
-            return {}
+            logger.error(f"Unexpected error in generate_answer: {e}")
+            return ""
 
 class Pipeline:
     def __init__(self):
         self.statement_generator = StatementGenerator()
         self.query_generator = QueryGenerator()
         self.answer_generator = AnswerGenerator()
-        self.all_statements = {}  # Dictionary to store all statements
-        self.all_evidence = {}  # Dictionary to store all evidence
+        self.all_statements = {}
+        self.all_evidence = {}
         self.pipeline_start_ts = int(time.time())
         self.trace_id = f"T{self.pipeline_start_ts}"
         self.session_id = f"S{self.pipeline_start_ts}"
         self.main_question = ""
         self.metadata = {}
-        self.latest_answer = []
+        self.latest_answer = ""
+        self.all_answers = []  # Store all generated answers
 
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
         self.main_question = main_question
         self.metadata = self.get_metadata()
         current_queries = [main_question]
         previous_queries_and_statements = ""
-        previous_analysis = ""
 
         output_folder = os.path.join(os.getcwd(), "output")
         os.makedirs(output_folder, exist_ok=True)
@@ -179,27 +177,26 @@ class Pipeline:
 
                 print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
 
-            # Update metadata for analysis and synthesis
+            # Update metadata for answer generation
             metadata = self.get_metadata()
             metadata['generation_name_suffix'] = f" [It{iteration+1}]"
 
-            # Generate research analysis and synthesis
-            analysis_and_synthesis = self.answer_generator.generate_analysis_and_synthesis(
+            # Generate research answer
+            answer = self.answer_generator.generate_answer(
                 main_question, previous_queries_and_statements, metadata
             )
-            if analysis_and_synthesis:
-                self.latest_answer = analysis_and_synthesis.get('synthesized_answer', [])
-                previous_analysis = json.dumps(analysis_and_synthesis)
+            if answer:
+                self.latest_answer = answer
+                self.all_answers.append(answer)  # Store the answer
             else:
-                logger.warning(f"Failed to generate analysis and synthesis for iteration {iteration + 1}")
-                previous_analysis = ""
+                logger.warning(f"Failed to generate answer for iteration {iteration + 1}")
 
             # Update metadata for generating next queries
             metadata = self.get_metadata()
             metadata['generation_name_suffix'] = f" [It{iteration+1}]"
 
             next_queries = self.query_generator.generate_next_queries(
-                main_question, previous_queries_and_statements, previous_analysis, num_queries, metadata
+                main_question, previous_queries_and_statements, self.latest_answer, num_queries, metadata
             )
             if not next_queries:
                 logger.error("Failed to generate next queries. Stopping the pipeline.")
@@ -230,6 +227,17 @@ class Pipeline:
         return f"Snippet text not found for ID: {snippet_id}"
 
     def generate_html_report(self) -> None:
+        md = markdown.Markdown()
+        
+        def process_answer(answer):
+            # Convert Markdown to HTML
+            html = md.convert(answer)
+            # Replace [S...] and [E...] with links
+            html = re.sub(r'\[(S\d+|E\d+)\]', r'<a href="#\1">[\1]</a>', html)
+            return html
+        
+        html_answers = [process_answer(answer) for answer in self.all_answers]
+        
         html_content = f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -243,12 +251,38 @@ class Pipeline:
                 table {{ border-collapse: collapse; width: 100%; }}
                 th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
                 th {{ background-color: #f2f2f2; }}
+                .nav-buttons {{ margin-bottom: 20px; }}
+                .nav-buttons button {{ margin-right: 10px; }}
             </style>
+            <script>
+                const answers = {json.dumps(html_answers)};
+                let currentIndex = {len(html_answers) - 1};  // Start with the last answer
+
+                function showAnswer(index) {{
+                    if (index >= 0 && index < answers.length) {{
+                        document.getElementById('answer-content').innerHTML = answers[index];
+                        document.getElementById('current-answer-index').textContent = `Answer ${{index + 1}} of ${{answers.length}}`;
+                        
+                        document.getElementById('prev-btn').disabled = (index === 0);
+                        document.getElementById('next-btn').disabled = (index === answers.length - 1);
+                        currentIndex = index;
+                    }}
+                }}
+
+                window.onload = function() {{
+                    showAnswer(currentIndex);  // Show the last answer on page load
+                }};
+            </script>
         </head>
         <body>
             <h1>{self.main_question}</h1>
-            <h2>Latest Available Answer</h2>
-            {self.generate_latest_answer_html()}
+            <h2>Generated Answers</h2>
+            <div class="nav-buttons">
+                <button id="prev-btn" onclick="showAnswer(currentIndex - 1)">Previous</button>
+                <span id="current-answer-index">Answer {len(html_answers)} of {len(html_answers)}</span>
+                <button id="next-btn" onclick="showAnswer(currentIndex + 1)">Next</button>
+            </div>
+            <div id="answer-content"></div>
             <h2>Support Table</h2>
             {self.generate_support_table_html()}
         </body>
@@ -257,14 +291,6 @@ class Pipeline:
 
         with open(self.output_path, 'w') as f:
             f.write(html_content)
-
-    def generate_latest_answer_html(self) -> str:
-        answer_html = "<p>"
-        for sentence in self.latest_answer:
-            support_links = ' '.join([f'<a href="#{s}">[{s}]</a>' for s in sentence['support']])
-            answer_html += f"{sentence['sentence']} {support_links}<br>"
-        answer_html += "</p>"
-        return answer_html
 
     def generate_support_table_html(self) -> str:
         table_html = """
@@ -303,6 +329,14 @@ class Pipeline:
 if __name__ == "__main__":
     main_question = "How do LLMs affect the freedom of speech in Russia?"
     main_question = "What is the impact of AI on the job market in Guatemala?"
+    main_question = "Do I really have to learn JS before learning node.js?"
+    main_question = "Who is right in the Israel-Gaza conflict?"
+    main_question = "How to work up to 10 hrs a week while travelling and living in a van, and earn more and more?"
+    main_question = "How can we develop an efficient and scalable method for performing k-NN search with cross-encoders that significantly reduces computational costs and resource demands while maintaining high recall accuracy in large-scale datasets?"
+    main_question = "what search engine has indexed full body research papers? so i could search by phrase from the body (not abstract) and find this paper"
+    main_question = "I need to find an optimal number of meals a day based on scientific evidence. Weight 80 kg, 34 y.o., 180 cm, train 3 times a week with some weights. I'd prefer less time on the kitchen, but more time for life and fun"
+    main_question = "Who is right in the Ukraine-Russia war?"
+    
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=2, num_queries=2)
+    pipeline.run(main_question=main_question, iterations=3, num_queries=2)
