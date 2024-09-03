@@ -166,7 +166,8 @@ class Pipeline:
                     self.all_statements[stmt['id']] = stmt  # Store the entire statement dictionary
                     for evidence in stmt['evidence']:
                         if evidence.startswith('E'):
-                            self.all_evidence[evidence] = self.get_snippet_text(evidence, search_results)
+                            evidence_data = self.get_snippet_text(evidence, search_results)
+                            self.all_evidence[evidence] = evidence_data
 
                 previous_queries_and_statements += f"\nQuery: {current_query}\n"
                 if statements:
@@ -218,13 +219,20 @@ class Pipeline:
             "generation_name_suffix": ""
         }
 
-    def get_snippet_text(self, snippet_id: str, search_results: dict) -> str:
+    def get_snippet_text(self, snippet_id: str, search_results: dict) -> dict:
         if snippet_id.startswith('S'):
-            return self.all_statements.get(snippet_id, "Statement text not found")
+            return self.all_statements.get(snippet_id, {"text": "Statement text not found", "meta": {}})
         for result in search_results.get('results', []):
             if result.get('id') == snippet_id:
-                return result.get('text', '')
-        return f"Snippet text not found for ID: {snippet_id}"
+                return {
+                    "text": result.get('text', ''),
+                    "meta": {
+                        "url": result.get('meta', {}).get('url', ''),
+                        "title": result.get('meta', {}).get('title', ''),
+                        "page_age": result.get('meta', {}).get('page_age', '')
+                    }
+                }
+        return {"text": f"Snippet text not found for ID: {snippet_id}", "meta": {}}
 
     def generate_html_report(self) -> None:
         md = markdown.Markdown()
@@ -305,9 +313,15 @@ class Pipeline:
                         'children': children
                     }
             elif node_id.startswith('E'):
+                evidence = self.all_evidence.get(node_id, "Evidence text not found")
+                url = ""
+                if isinstance(evidence, dict):
+                    url = evidence.get('meta', {}).get('url', '')
+                    evidence = evidence.get('text', "Evidence text not found")
                 return {
                     'id': node_id,
-                    'text': self.all_evidence.get(node_id, "Evidence text not found"),
+                    'text': evidence,
+                    'url': url,
                     'children': []
                 }
             return None
@@ -316,7 +330,12 @@ class Pipeline:
             if not node:
                 return ""
             
-            html = f'<li id="{node["id"]}"><strong>{node["id"]}:</strong> {node["text"]}'
+            html = f'<li id="tree-{node["id"]}"><strong>{node["id"]}:</strong> {node["text"]}'
+            if node['id'].startswith('E'):
+                evidence = self.all_evidence.get(node['id'], {})
+                url = evidence.get('meta', {}).get('url', '')
+                if url:
+                    html += f'<br><a href="{url}" target="_blank">{url}</a>'
             if node['children']:
                 html += '<ul>'
                 for child in node['children']:
@@ -347,8 +366,8 @@ if __name__ == "__main__":
     main_question = "How can we develop an efficient and scalable method for performing k-NN search with cross-encoders that significantly reduces computational costs and resource demands while maintaining high recall accuracy in large-scale datasets?"
     main_question = "what search engine has indexed full body research papers? so i could search by phrase from the body (not abstract) and find this paper"
     main_question = "I need to find an optimal number of meals a day based on scientific evidence. Weight 80 kg, 34 y.o., 180 cm, train 3 times a week with some weights. I'd prefer less time on the kitchen, but more time for life and fun"
-    main_question = "Who is right in the Ukraine-Russia war?"
+    main_question = "Who is right in the Ukraine-Russia war"
     
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=2, num_queries=2)
+    pipeline.run(main_question=main_question, iterations=1, num_queries=1)
