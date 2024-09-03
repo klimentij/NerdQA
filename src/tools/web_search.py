@@ -10,7 +10,7 @@ import hashlib
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 from src.util.env_util import cfg
-from src.db.cache_llm import CacheLLM
+from src.db.local_cache import LocalCache
 
 # Set up logger
 from src.util.setup_logging import setup_logging
@@ -32,7 +32,7 @@ class BraveSearchClient:
         self.session = requests.Session()
         retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
-        self.cache = CacheLLM()
+        self.cache = LocalCache()
 
     def search(self, query, **kwargs):
         """
@@ -68,10 +68,10 @@ class BraveSearchClient:
             num_results = len(filtered_results)
             logger.debug(f"Number of returned results: {num_results}")
 
-            # Store filtered results in cache as a dict
+            # Store filtered results in cache
             latency = time.time() - start_time
             logger.debug(f"Received and processed response in {latency:.4f} seconds")
-            self.cache.set(params, self.headers, filtered_results)
+            self.cache.set(params, filtered_results)
 
             # Wrap the results in a dictionary
             return {"results": filtered_results}
@@ -122,20 +122,25 @@ class BraveSearchClient:
 
     def _format_text_as_json(self, text, meta=None):
         """
-        Format text as a JSON object with 'id', 'text', and 'meta' keys.
+        Format text as a JSON object with 'id', 'meta', and 'text' keys.
+        Drop empty/none fields from meta.
 
         Parameters:
             text (str): The text to format.
             meta (dict): Metadata for the text.
 
         Returns:
-            dict: A JSON object with 'id', 'text', and 'meta' keys.
+            dict: A JSON object with 'id', 'meta', and 'text' keys.
         """
         text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
         unique_id = f"E{text_hash % 10**10:010d}"
-        return {"id": unique_id, "text": text, "meta": meta or {}}
+        
+        # Drop empty/none fields from meta
+        cleaned_meta = {k: v for k, v in (meta or {}).items() if v}
+        
+        return {"id": unique_id, "meta": cleaned_meta, "text": text}
 
 # Example usage
 # brave_search = BraveSearchClient()
-# results = brave_search.search("Can the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approaches?")
+# results = brave_search.search("Can the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approache`?")
 # logger.info(f"Search results: \n\n{json.dumps(results, indent=2, sort_keys=False)}")

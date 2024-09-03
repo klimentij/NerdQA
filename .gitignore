@@ -166,3 +166,6 @@ logs/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Cache folder
+cache/

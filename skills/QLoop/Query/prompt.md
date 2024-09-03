@@ -18,12 +18,12 @@ This is a comprehensive record of all the queries we've used so far and the key 
 {{$PREVIOUS_QUERIES_AND_STATEMENTS}}
 """
 
-## Previous Analysis
+## Current Best Answer
 
-This is the analysis and synthesis from the previous iteration. It provides insights into the current state of the research and areas that may need further exploration.
+This is the current best answer synthesized from the existing statements. It represents the most up-to-date and comprehensive summary of our research findings.
 
 """
-{{$PREVIOUS_ANALYSIS}}
+{{$CURRENT_BEST_ANSWER}}
 """
 
 ## Number of Queries to Generate
@@ -34,15 +34,15 @@ You must generate exactly {{$NUM_QUERIES}} queries.
 
 ### STEP 1: Progress Assessment
 
-Carefully analyze the previous queries, statements, and the most recent analysis. Determine whether the research is making meaningful progress or if it appears to be stagnating. Consider:
+Carefully analyze the previous queries, statements, and the current best answer. Determine whether the research is making meaningful progress or if it appears to be stagnating. Consider:
 
-1. Are recent queries yielding substantially new information?
-2. Is the research converging towards answering the main question, or is it circling around similar points?
+1. Is the current best answer providing a comprehensive response to the main question?
+2. Are there aspects of the main question that remain unanswered or under-explored?
 3. Have we exhausted the current line of inquiry?
-4. Does the previous analysis highlight any under-explored areas or suggest new directions?
+4. Does the current best answer highlight any under-explored areas or suggest new directions?
 5. Are there any contradictions or gaps in our current understanding that need to be addressed?
 
-Provide a brief assessment of the research progress, taking into account both the previous queries/statements and the latest analysis.
+Provide a brief assessment of the research progress, taking into account both the previous queries/statements and the current best answer.
 
 ### STEP 2: Strategy Formulation
 

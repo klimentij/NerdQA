@@ -63,14 +63,14 @@ class QueryGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Query'))
 
-    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, previous_analysis: str, num_queries: int, metadata: dict) -> List[str]:
+    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, current_best_answer: str, num_queries: int, metadata: dict) -> List[str]:
         logger.info(f"Generating next {num_queries} queries")
         
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
                 "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements,
-                "PREVIOUS_ANALYSIS": previous_analysis,
+                "CURRENT_BEST_ANSWER": current_best_answer,
                 "NUM_QUERIES": num_queries
             },
             completion_kwargs={"metadata": metadata}
@@ -230,10 +230,8 @@ class Pipeline:
         md = markdown.Markdown()
         
         def process_answer(answer):
-            # Convert Markdown to HTML
             html = md.convert(answer)
-            # Replace [S...] and [E...] with links
-            html = re.sub(r'\[(S\d+|E\d+)\]', r'<a href="#\1">[\1]</a>', html)
+            html = re.sub(r'\[(S\d+|E\d+)\]', r'<a href="#tree-\1" class="citation" id="cite-\1">[\1]</a>', html)
             return html
         
         html_answers = [process_answer(answer) for answer in self.all_answers]
@@ -247,16 +245,17 @@ class Pipeline:
             <title>{self.main_question}</title>
             <style>
                 body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
-                h1 {{ color: #333; }}
-                table {{ border-collapse: collapse; width: 100%; }}
-                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                th {{ background-color: #f2f2f2; }}
+                h1, h2, h3 {{ color: #333; }}
                 .nav-buttons {{ margin-bottom: 20px; }}
                 .nav-buttons button {{ margin-right: 10px; }}
+                .citation-tree {{ margin-top: 20px; }}
+                .citation-tree ul {{ list-style-type: none; }}
+                .citation-tree li {{ margin: 10px 0; }}
+                .back-to-top {{ text-decoration: none; color: #0066cc; }}
             </style>
             <script>
                 const answers = {json.dumps(html_answers)};
-                let currentIndex = {len(html_answers) - 1};  // Start with the last answer
+                let currentIndex = {len(html_answers) - 1};
 
                 function showAnswer(index) {{
                     if (index >= 0 && index < answers.length) {{
@@ -270,7 +269,7 @@ class Pipeline:
                 }}
 
                 window.onload = function() {{
-                    showAnswer(currentIndex);  // Show the last answer on page load
+                    showAnswer(currentIndex);
                 }};
             </script>
         </head>
@@ -283,8 +282,10 @@ class Pipeline:
                 <button id="next-btn" onclick="showAnswer(currentIndex + 1)">Next</button>
             </div>
             <div id="answer-content"></div>
-            <h2>Support Table</h2>
-            {self.generate_support_table_html()}
+            <h2>Citation Trees</h2>
+            <div class="citation-tree">
+                {self.generate_citation_tree_html()}
+            </div>
         </body>
         </html>
         """
@@ -292,39 +293,50 @@ class Pipeline:
         with open(self.output_path, 'w') as f:
             f.write(html_content)
 
-    def generate_support_table_html(self) -> str:
-        table_html = """
-        <table>
-            <tr>
-                <th>ID</th>
-                <th>Text</th>
-                <th>Support</th>
-            </tr>
-        """
-        for stmt_id, stmt_text in self.all_statements.items():
-            table_html += f"""
-            <tr id="{stmt_id}">
-                <td>{stmt_id}</td>
-                <td>{stmt_text}</td>
-                <td>{self.get_statement_support(stmt_id)}</td>
-            </tr>
-            """
-        for evidence_id, evidence_text in self.all_evidence.items():
-            table_html += f"""
-            <tr id="{evidence_id}">
-                <td>{evidence_id}</td>
-                <td>{evidence_text}</td>
-                <td>External evidence</td>
-            </tr>
-            """
-        table_html += "</table>"
-        return table_html
+    def generate_citation_tree_html(self) -> str:
+        def build_tree(node_id):
+            if node_id.startswith('S'):
+                statement = self.all_statements.get(node_id)
+                if isinstance(statement, dict):
+                    children = [build_tree(e) for e in statement.get('evidence', [])]
+                    return {
+                        'id': node_id,
+                        'text': statement['text'],
+                        'children': children
+                    }
+            elif node_id.startswith('E'):
+                return {
+                    'id': node_id,
+                    'text': self.all_evidence.get(node_id, "Evidence text not found"),
+                    'children': []
+                }
+            return None
 
-    def get_statement_support(self, stmt_id: str) -> str:
-        statement = self.all_statements.get(stmt_id)
-        if isinstance(statement, dict):
-            return ', '.join([f'<a href="#{e}">{e}</a>' for e in statement.get('evidence', [])])
-        return "No support found"
+        def render_tree(node):
+            if not node:
+                return ""
+            
+            html = f'<li id="{node["id"]}"><strong>{node["id"]}:</strong> {node["text"]}'
+            if node['children']:
+                html += '<ul>'
+                for child in node['children']:
+                    html += render_tree(child)
+                html += '</ul>'
+            html += '</li>'
+            return html
+
+        # Build and render trees for each top-level statement
+        trees_html = ""
+        for stmt_id in self.all_statements.keys():
+            tree = build_tree(stmt_id)
+            if tree:
+                trees_html += f'<h3 id="tree-{stmt_id}">Citation Tree for Statement {stmt_id}</h3>'
+                trees_html += '<ul>'
+                trees_html += render_tree(tree)
+                trees_html += '</ul>'
+                trees_html += f'<a href="#cite-{stmt_id}" class="back-to-top">↑ Back to citation</a>'
+
+        return trees_html
 
 if __name__ == "__main__":
     main_question = "How do LLMs affect the freedom of speech in Russia?"
@@ -339,4 +351,4 @@ if __name__ == "__main__":
     
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=3, num_queries=2)
+    pipeline.run(main_question=main_question, iterations=2, num_queries=2)
