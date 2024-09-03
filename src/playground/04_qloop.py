@@ -239,10 +239,13 @@ class Pipeline:
         
         def process_answer(answer):
             html = md.convert(answer)
+            citations = re.findall(r'\[(S\d+|E\d+)\]', html)
             html = re.sub(r'\[(S\d+|E\d+)\]', r'<a href="#tree-\1" class="citation" id="cite-\1">[\1]</a>', html)
-            return html
+            return html, citations
         
-        html_answers = [process_answer(answer) for answer in self.all_answers]
+        processed_answers = [process_answer(answer) for answer in self.all_answers]
+        html_answers = [answer[0] for answer in processed_answers]
+        answer_citations = [answer[1] for answer in processed_answers]
         
         html_content = f"""
         <!DOCTYPE html>
@@ -263,6 +266,7 @@ class Pipeline:
             </style>
             <script>
                 const answers = {json.dumps(html_answers)};
+                const answerCitations = {json.dumps(answer_citations)};
                 let currentIndex = {len(html_answers) - 1};
 
                 function showAnswer(index) {{
@@ -273,6 +277,17 @@ class Pipeline:
                         document.getElementById('prev-btn').disabled = (index === 0);
                         document.getElementById('next-btn').disabled = (index === answers.length - 1);
                         currentIndex = index;
+
+                        // Update citation trees
+                        const citationTrees = document.querySelectorAll('.citation-tree');
+                        citationTrees.forEach(tree => {{
+                            const treeId = tree.id.replace('tree-', '');
+                            if (answerCitations[index].includes(treeId)) {{
+                                tree.style.display = 'block';
+                            }} else {{
+                                tree.style.display = 'none';
+                            }}
+                        }});
                     }}
                 }}
 
@@ -291,9 +306,7 @@ class Pipeline:
             </div>
             <div id="answer-content"></div>
             <h2>Citation Trees</h2>
-            <div class="citation-tree">
-                {self.generate_citation_tree_html()}
-            </div>
+            {self.generate_citation_tree_html()}
         </body>
         </html>
         """
@@ -302,11 +315,15 @@ class Pipeline:
             f.write(html_content)
 
     def generate_citation_tree_html(self) -> str:
-        def build_tree(node_id):
+        def build_tree(node_id, depth=0, max_depth=50):
+            if depth >= max_depth:
+                return None
+            
             if node_id.startswith('S'):
                 statement = self.all_statements.get(node_id)
                 if isinstance(statement, dict):
-                    children = [build_tree(e) for e in statement.get('evidence', [])]
+                    children = [build_tree(e, depth + 1, max_depth) for e in statement.get('evidence', [])]
+                    children = [child for child in children if child is not None]
                     return {
                         'id': node_id,
                         'text': statement['text'],
@@ -349,11 +366,13 @@ class Pipeline:
         for stmt_id in self.all_statements.keys():
             tree = build_tree(stmt_id)
             if tree:
-                trees_html += f'<h3 id="tree-{stmt_id}">Citation Tree for Statement {stmt_id}</h3>'
+                trees_html += f'<div class="citation-tree" id="tree-{stmt_id}">'
+                trees_html += f'<h3>Citation Tree for Statement {stmt_id}</h3>'
                 trees_html += '<ul>'
                 trees_html += render_tree(tree)
                 trees_html += '</ul>'
                 trees_html += f'<a href="#cite-{stmt_id}" class="back-to-top">↑ Back to citation</a>'
+                trees_html += '</div>'
 
         return trees_html
 
@@ -361,13 +380,13 @@ if __name__ == "__main__":
     main_question = "How do LLMs affect the freedom of speech in Russia?"
     main_question = "What is the impact of AI on the job market in Guatemala?"
     main_question = "Do I really have to learn JS before learning node.js?"
-    main_question = "Who is right in the Israel-Gaza conflict?"
     main_question = "How to work up to 10 hrs a week while travelling and living in a van, and earn more and more?"
     main_question = "How can we develop an efficient and scalable method for performing k-NN search with cross-encoders that significantly reduces computational costs and resource demands while maintaining high recall accuracy in large-scale datasets?"
     main_question = "what search engine has indexed full body research papers? so i could search by phrase from the body (not abstract) and find this paper"
     main_question = "I need to find an optimal number of meals a day based on scientific evidence. Weight 80 kg, 34 y.o., 180 cm, train 3 times a week with some weights. I'd prefer less time on the kitchen, but more time for life and fun"
     main_question = "Who is right in the Ukraine-Russia war"
+    main_question = "Who is right in the Israel-Gaza conflict?"
     
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=1, num_queries=1)
+    pipeline.run(main_question=main_question, iterations=20, num_queries=2)
