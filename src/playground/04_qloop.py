@@ -149,64 +149,59 @@ class Pipeline:
         output_filename = f"{safe_question}_report.html"
         self.output_path = os.path.join(output_folder, output_filename)
 
+        current_queries = []
+
         for iteration in range(iterations):
+            metadata = self.get_metadata()
+            metadata['generation_name_suffix'] = f" [It{iteration+1}]"
+
+            # Generate queries (for the first iteration or using previous data)
             if iteration == 0:
-                # For the first iteration, generate queries directly from the main question
-                metadata = self.get_metadata()
-                metadata['generation_name_suffix'] = f" [It{iteration+1}]"
                 current_queries = self.query_generator.generate_next_queries(
                     main_question, "", "", num_queries, metadata
                 )
             else:
-                # Process queries and generate statements
-                for query_index, current_query in enumerate(current_queries[:num_queries], 1):
-                    metadata = self.get_metadata()
-                    metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
-
-                    statements, search_results = self.statement_generator.generate_statements(
-                        main_question, current_query, previous_queries_and_statements, metadata
-                    )
-                    
-                    # Store all generated statements and evidence
-                    for stmt in statements:
-                        self.all_statements[stmt['id']] = stmt
-                        for evidence in stmt['evidence']:
-                            if evidence.startswith('E'):
-                                evidence_data = self.get_snippet_text(evidence, search_results)
-                                self.all_evidence[evidence] = evidence_data
-
-                    previous_queries_and_statements += f"\nQuery: {current_query}\n"
-                    if statements:
-                        for stmt in statements:
-                            previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
-                    else:
-                        previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
-
-                    print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
-
-                # Generate research answer (skip for the first iteration)
-                metadata = self.get_metadata()
-                metadata['generation_name_suffix'] = f" [It{iteration+1}]"
-                answer = self.answer_generator.generate_answer(
-                    main_question, previous_queries_and_statements, metadata
+                current_queries = self.query_generator.generate_next_queries(
+                    main_question, previous_queries_and_statements, self.latest_answer, num_queries, metadata
                 )
-                if answer:
-                    self.latest_answer = answer
-                    self.all_answers.append(answer)
-                else:
-                    logger.warning(f"Failed to generate answer for iteration {iteration + 1}")
 
-            # Generate next queries for all iterations
+            # Process queries and generate statements
+            for query_index, current_query in enumerate(current_queries[:num_queries], 1):
+                metadata = self.get_metadata()
+                metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
+
+                statements, search_results = self.statement_generator.generate_statements(
+                    main_question, current_query, previous_queries_and_statements, metadata
+                )
+                
+                # Store all generated statements and evidence
+                for stmt in statements:
+                    self.all_statements[stmt['id']] = stmt
+                    for evidence in stmt['evidence']:
+                        if evidence.startswith('E'):
+                            evidence_data = self.get_snippet_text(evidence, search_results)
+                            self.all_evidence[evidence] = evidence_data
+
+                previous_queries_and_statements += f"\nQuery: {current_query}\n"
+                if statements:
+                    for stmt in statements:
+                        previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
+                else:
+                    previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
+
+                print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
+
+            # Generate research answer
             metadata = self.get_metadata()
             metadata['generation_name_suffix'] = f" [It{iteration+1}]"
-            next_queries = self.query_generator.generate_next_queries(
-                main_question, previous_queries_and_statements, self.latest_answer, num_queries, metadata
+            answer = self.answer_generator.generate_answer(
+                main_question, previous_queries_and_statements, metadata
             )
-            if not next_queries:
-                logger.error("Failed to generate next queries. Stopping the pipeline.")
-                break
-
-            current_queries = next_queries
+            if answer:
+                self.latest_answer = answer
+                self.all_answers.append(answer)
+            else:
+                logger.warning(f"Failed to generate answer for iteration {iteration + 1}")
 
             # Generate the HTML report after each iteration
             self.generate_html_report()
