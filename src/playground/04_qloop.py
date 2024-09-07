@@ -136,6 +136,10 @@ class Pipeline:
         self.metadata = {}
         self.latest_answer = ""
         self.all_answers = []  # Store all generated answers
+        self.all_evidence_ids = set()
+        self.used_evidence_ids = set()
+        self.iteration_summaries = []
+        self.total_statements = 0
 
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
         self.main_question = main_question
@@ -165,6 +169,11 @@ class Pipeline:
                     main_question, previous_queries_and_statements, self.latest_answer, num_queries, metadata
                 )
 
+            new_evidence_found = 0
+            new_evidence_used = 0
+            new_statements = 0
+            iteration_evidence_ids = set()
+
             # Process queries and generate statements
             for query_index, current_query in enumerate(current_queries[:num_queries], 1):
                 metadata = self.get_metadata()
@@ -174,11 +183,24 @@ class Pipeline:
                     main_question, current_query, previous_queries_and_statements, metadata
                 )
                 
-                # Store all generated statements and evidence
+                # Count all search results as evidence found
+                for result in search_results.get('results', []):
+                    evidence_id = result.get('id')
+                    if evidence_id and evidence_id not in self.all_evidence_ids:
+                        new_evidence_found += 1
+                        self.all_evidence_ids.add(evidence_id)
+
+                # Count new statements and evidence used
                 for stmt in statements:
+                    new_statements += 1
+                    self.total_statements += 1
                     self.all_statements[stmt['id']] = stmt
                     for evidence in stmt['evidence']:
                         if evidence.startswith('E'):
+                            if evidence not in self.used_evidence_ids:
+                                new_evidence_used += 1
+                                self.used_evidence_ids.add(evidence)
+                            iteration_evidence_ids.add(evidence)
                             evidence_data = self.get_snippet_text(evidence, search_results)
                             self.all_evidence[evidence] = evidence_data
 
@@ -190,6 +212,18 @@ class Pipeline:
                     previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
 
                 print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
+
+            # Generate iteration summary
+            iteration_summary = {
+                "iteration": iteration + 1,
+                "new_evidence_found": new_evidence_found,
+                "new_evidence_used": new_evidence_used,
+                "new_statements": new_statements,
+                "total_evidence_found": len(self.all_evidence_ids),
+                "total_evidence_used": len(self.used_evidence_ids),
+                "total_statements": self.total_statements
+            }
+            self.iteration_summaries.append(iteration_summary)
 
             # Generate research answer
             metadata = self.get_metadata()
@@ -235,13 +269,53 @@ class Pipeline:
     def generate_html_report(self) -> None:
         md = markdown.Markdown()
         
-        def process_answer(answer):
+        # Prepare data for the chart
+        chart_data = {
+            'iterations': [],
+            'new_evidence_discovered': [],
+            'new_evidence_incorporated': [],
+            'new_statements_generated': [],
+            'statements_cited': [],
+        }
+
+        for i, summary in enumerate(self.iteration_summaries):
+            chart_data['iterations'].append(summary['iteration'])
+            chart_data['new_evidence_discovered'].append(summary['new_evidence_found'])
+            chart_data['new_evidence_incorporated'].append(summary['new_evidence_used'])
+            chart_data['new_statements_generated'].append(summary['new_statements'])
+            
+            citations = set(re.findall(r'\[(S\d+|E\d+)\]', self.all_answers[i]))
+            statements_cited = len([c for c in citations if c.startswith('S')])
+            chart_data['statements_cited'].append(statements_cited)
+
+        def process_answer(answer, iteration_summary):
             html = md.convert(answer)
             citations = re.findall(r'\[(S\d+|E\d+)\]', html)
             html = re.sub(r'\[(S\d+|E\d+)\]', r'<a href="#tree-\1" class="citation" id="cite-\1">[\1]</a>', html)
+            
+            # Add iteration summary
+            total_evidence = iteration_summary['total_evidence_found']
+            total_statements = iteration_summary['total_statements']
+            
+            evidence_found_percentage = (iteration_summary['new_evidence_found'] / total_evidence) * 100 if total_evidence > 0 else 0
+            evidence_used_percentage = (iteration_summary['new_evidence_used'] / total_evidence) * 100 if total_evidence > 0 else 0
+            new_statements_percentage = (iteration_summary['new_statements'] / total_statements) * 100 if total_statements > 0 else 0
+            
+            statements_mentioned = len(set(citations))
+            statements_mentioned_percentage = (statements_mentioned / total_statements) * 100 if total_statements > 0 else 0
+            
+            html += f"""
+            <h3>Iteration Summary</h3>
+            <ul>
+                <li>New evidence discovered: {iteration_summary['new_evidence_found']} of {total_evidence} ({evidence_found_percentage:.2f}% of all evidence)</li>
+                <li>New evidence incorporated: {iteration_summary['new_evidence_used']} of {total_evidence} ({evidence_used_percentage:.2f}% of all evidence)</li>
+                <li>New statements generated: {iteration_summary['new_statements']} of {total_statements} ({new_statements_percentage:.2f}% of all statements)</li>
+                <li>Statements directly cited in answer: {statements_mentioned} of {total_statements} ({statements_mentioned_percentage:.2f}% of all statements)</li>
+            </ul>
+            """
             return html, citations
         
-        processed_answers = [process_answer(answer) for answer in self.all_answers]
+        processed_answers = [process_answer(answer, summary) for answer, summary in zip(self.all_answers, self.iteration_summaries)]
         html_answers = [answer[0] for answer in processed_answers]
         answer_citations = [answer[1] for answer in processed_answers]
         
@@ -252,6 +326,7 @@ class Pipeline:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{self.main_question}</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <style>
                 body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
                 h1, h2, h3 {{ color: #333; }}
@@ -261,7 +336,22 @@ class Pipeline:
                 .citation-tree ul {{ list-style-type: none; }}
                 .citation-tree li {{ margin: 10px 0; }}
                 .back-to-top {{ text-decoration: none; color: #0066cc; }}
+                #currentMetricsChart {{ width: 100%; height: 400px; margin-bottom: 20px; }}
             </style>
+        </head>
+        <body>
+            <h1>{self.main_question}</h1>
+            <h2>Research Progress</h2>
+            <canvas id="currentMetricsChart"></canvas>
+            <h2>Generated Answers</h2>
+            <div class="nav-buttons">
+                <button id="prev-btn" onclick="showAnswer(currentIndex - 1)">Previous</button>
+                <span id="current-answer-index">Iteration {len(html_answers)} of {len(html_answers)}</span>
+                <button id="next-btn" onclick="showAnswer(currentIndex + 1)">Next</button>
+            </div>
+            <div id="answer-content"></div>
+            <h2>Citation Trees</h2>
+            {self.generate_citation_tree_html()}
             <script>
                 const answers = {json.dumps(html_answers)};
                 const answerCitations = {json.dumps(answer_citations)};
@@ -270,7 +360,7 @@ class Pipeline:
                 function showAnswer(index) {{
                     if (index >= 0 && index < answers.length) {{
                         document.getElementById('answer-content').innerHTML = answers[index];
-                        document.getElementById('current-answer-index').textContent = `Answer ${{index + 1}} of ${{answers.length}}`;
+                        document.getElementById('current-answer-index').textContent = `Iteration ${{index + 1}} of ${{answers.length}}`;
                         
                         document.getElementById('prev-btn').disabled = (index === 0);
                         document.getElementById('next-btn').disabled = (index === answers.length - 1);
@@ -291,20 +381,67 @@ class Pipeline:
 
                 window.onload = function() {{
                     showAnswer(currentIndex);
+                    renderChart();
                 }};
+
+                function renderChart() {{
+                    const ctx = document.getElementById('currentMetricsChart').getContext('2d');
+                    new Chart(ctx, {{
+                        type: 'line',
+                        data: {{
+                            labels: {json.dumps(chart_data['iterations'])},
+                            datasets: [
+                                {{
+                                    label: 'New Evidence Discovered',
+                                    data: {json.dumps(chart_data['new_evidence_discovered'])},
+                                    borderColor: 'rgb(75, 192, 192)',
+                                    tension: 0.1
+                                }},
+                                {{
+                                    label: 'New Evidence Incorporated',
+                                    data: {json.dumps(chart_data['new_evidence_incorporated'])},
+                                    borderColor: 'rgb(255, 99, 132)',
+                                    tension: 0.1
+                                }},
+                                {{
+                                    label: 'New Statements Generated',
+                                    data: {json.dumps(chart_data['new_statements_generated'])},
+                                    borderColor: 'rgb(255, 205, 86)',
+                                    tension: 0.1
+                                }},
+                                {{
+                                    label: 'Statements Cited',
+                                    data: {json.dumps(chart_data['statements_cited'])},
+                                    borderColor: 'rgb(54, 162, 235)',
+                                    tension: 0.1
+                                }}
+                            ]
+                        }},
+                        options: {{
+                            responsive: true,
+                            title: {{
+                                display: true,
+                                text: 'Current Metrics per Iteration'
+                            }},
+                            scales: {{
+                                x: {{
+                                    title: {{
+                                        display: true,
+                                        text: 'Iteration'
+                                    }}
+                                }},
+                                y: {{
+                                    title: {{
+                                        display: true,
+                                        text: 'Count'
+                                    }},
+                                    beginAtZero: true
+                                }}
+                            }}
+                        }}
+                    }});
+                }}
             </script>
-        </head>
-        <body>
-            <h1>{self.main_question}</h1>
-            <h2>Generated Answers</h2>
-            <div class="nav-buttons">
-                <button id="prev-btn" onclick="showAnswer(currentIndex - 1)">Previous</button>
-                <span id="current-answer-index">Answer {len(html_answers)} of {len(html_answers)}</span>
-                <button id="next-btn" onclick="showAnswer(currentIndex + 1)">Next</button>
-            </div>
-            <div id="answer-content"></div>
-            <h2>Citation Trees</h2>
-            {self.generate_citation_tree_html()}
         </body>
         </html>
         """
@@ -392,7 +529,10 @@ if __name__ == "__main__":
     main_question = "how to make pgvector hnsw work with proper pre-filter  and how to select from this if I want to pre filter by 3-4 categories? example queries"
     main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media?"
     main_question = "what people think about Company called 'voyage ai', can i trust my data to it"
+    main_question = "How can we design and implement a global, interconnected sensor network to monitor and predict natural disasters, integrating data from various sources to improve early warning systems and disaster response?"
+    main_question = "how many r's in straberry"
+    main_question = "поставили бактериальную пневмонию, третий день пью антибиотик иногда подкашливаю. сейчас придут друзья в гости, мне нужно одеть маску?"
     
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=3, num_queries=2)
+    pipeline.run(main_question=main_question, iterations=10, num_queries=2)
