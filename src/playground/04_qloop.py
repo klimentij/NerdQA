@@ -140,7 +140,6 @@ class Pipeline:
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
         self.main_question = main_question
         self.metadata = self.get_metadata()
-        current_queries = [main_question]
         previous_queries_and_statements = ""
 
         output_folder = os.path.join(os.getcwd(), "output")
@@ -151,51 +150,55 @@ class Pipeline:
         self.output_path = os.path.join(output_folder, output_filename)
 
         for iteration in range(iterations):
-            # Process only num_queries queries
-            for query_index, current_query in enumerate(current_queries[:num_queries], 1):
-                # Update metadata with iteration and query indices
+            if iteration == 0:
+                # For the first iteration, generate queries directly from the main question
                 metadata = self.get_metadata()
-                metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
-
-                statements, search_results = self.statement_generator.generate_statements(
-                    main_question, current_query, previous_queries_and_statements, metadata
+                metadata['generation_name_suffix'] = f" [It{iteration+1}]"
+                current_queries = self.query_generator.generate_next_queries(
+                    main_question, "", "", num_queries, metadata
                 )
-                
-                # Store all generated statements and evidence
-                for stmt in statements:
-                    self.all_statements[stmt['id']] = stmt  # Store the entire statement dictionary
-                    for evidence in stmt['evidence']:
-                        if evidence.startswith('E'):
-                            evidence_data = self.get_snippet_text(evidence, search_results)
-                            self.all_evidence[evidence] = evidence_data
-
-                previous_queries_and_statements += f"\nQuery: {current_query}\n"
-                if statements:
-                    for stmt in statements:
-                        previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
-                else:
-                    previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
-
-                print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
-
-            # Update metadata for answer generation
-            metadata = self.get_metadata()
-            metadata['generation_name_suffix'] = f" [It{iteration+1}]"
-
-            # Generate research answer
-            answer = self.answer_generator.generate_answer(
-                main_question, previous_queries_and_statements, metadata
-            )
-            if answer:
-                self.latest_answer = answer
-                self.all_answers.append(answer)  # Store the answer
             else:
-                logger.warning(f"Failed to generate answer for iteration {iteration + 1}")
+                # Process queries and generate statements
+                for query_index, current_query in enumerate(current_queries[:num_queries], 1):
+                    metadata = self.get_metadata()
+                    metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
 
-            # Update metadata for generating next queries
+                    statements, search_results = self.statement_generator.generate_statements(
+                        main_question, current_query, previous_queries_and_statements, metadata
+                    )
+                    
+                    # Store all generated statements and evidence
+                    for stmt in statements:
+                        self.all_statements[stmt['id']] = stmt
+                        for evidence in stmt['evidence']:
+                            if evidence.startswith('E'):
+                                evidence_data = self.get_snippet_text(evidence, search_results)
+                                self.all_evidence[evidence] = evidence_data
+
+                    previous_queries_and_statements += f"\nQuery: {current_query}\n"
+                    if statements:
+                        for stmt in statements:
+                            previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
+                    else:
+                        previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
+
+                    print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
+
+                # Generate research answer (skip for the first iteration)
+                metadata = self.get_metadata()
+                metadata['generation_name_suffix'] = f" [It{iteration+1}]"
+                answer = self.answer_generator.generate_answer(
+                    main_question, previous_queries_and_statements, metadata
+                )
+                if answer:
+                    self.latest_answer = answer
+                    self.all_answers.append(answer)
+                else:
+                    logger.warning(f"Failed to generate answer for iteration {iteration + 1}")
+
+            # Generate next queries for all iterations
             metadata = self.get_metadata()
             metadata['generation_name_suffix'] = f" [It{iteration+1}]"
-
             next_queries = self.query_generator.generate_next_queries(
                 main_question, previous_queries_and_statements, self.latest_answer, num_queries, metadata
             )
@@ -315,14 +318,19 @@ class Pipeline:
             f.write(html_content)
 
     def generate_citation_tree_html(self) -> str:
-        def build_tree(node_id, depth=0, max_depth=50):
-            if depth >= max_depth:
+        def build_tree(node_id, depth=0, max_depth=5, visited=None):
+            if visited is None:
+                visited = set()
+            
+            if depth >= max_depth or node_id in visited:
                 return None
+            
+            visited.add(node_id)
             
             if node_id.startswith('S'):
                 statement = self.all_statements.get(node_id)
                 if isinstance(statement, dict):
-                    children = [build_tree(e, depth + 1, max_depth) for e in statement.get('evidence', [])]
+                    children = [build_tree(e, depth + 1, max_depth, visited.copy()) for e in statement.get('evidence', [])]
                     children = [child for child in children if child is not None]
                     return {
                         'id': node_id,
@@ -386,7 +394,10 @@ if __name__ == "__main__":
     main_question = "I need to find an optimal number of meals a day based on scientific evidence. Weight 80 kg, 34 y.o., 180 cm, train 3 times a week with some weights. I'd prefer less time on the kitchen, but more time for life and fun"
     main_question = "Who is right in the Ukraine-Russia war"
     main_question = "Who is right in the Israel-Gaza conflict?"
+    main_question = "how to make pgvector hnsw work with proper pre-filter  and how to select from this if I want to pre filter by 3-4 categories? example queries"
+    main_question = "What psychological biases and cognitive mechanisms make people more susceptible to political polarization on social media?"
+    main_question = "what people think about Company called 'voyage ai', can i trust my data to it"
     
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=20, num_queries=2)
+    pipeline.run(main_question=main_question, iterations=3, num_queries=2)
