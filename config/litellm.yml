@@ -29,7 +29,10 @@ litellm_settings:
   redact_user_api_key_info: true
   cache: True
   cache_params:
-    type: local
+    type: redis
+    host: localhost
+    port: 6379
+    password: "" # leave empty if no password set
     ttl: 25920000  # 300 days in seconds (300 * 24 * 60 * 60)
 
 general_settings: 

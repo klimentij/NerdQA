@@ -535,4 +535,5 @@ if __name__ == "__main__":
     
 
     pipeline = Pipeline()
-    pipeline.run(main_question=main_question, iterations=10, num_queries=2)
+    
+    pipeline.run(main_question=main_question, iterations=1, num_queries=2)
