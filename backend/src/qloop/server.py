@@ -1,7 +1,26 @@
-# @src/qloop/server.py
+# uvicorn server:app --reload
+
+import json
+import os
+import re
+import sys
+import datetime
+import hashlib
+import time
+from typing import List, Tuple, Optional
+import markdown
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Import necessary modules and set up paths
+os.chdir(__file__.split('src/')[0])
+sys.path.append(os.getcwd())
+
+from src.qloop.pipeline import Pipeline
+from src.util.setup_logging import setup_logging
+
+logger = setup_logging(__file__)
 
 app = FastAPI()
 
@@ -14,45 +33,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class Message(BaseModel):
+class Question(BaseModel):
     content: str
 
-class ExampleMessage(BaseModel):
-    heading: str
-    subheading: str
-    message: str
+pipeline = Pipeline()
 
-@app.post("/api/message")
-async def process_message(message: Message):
-    # This is where you'd normally call your Pipeline or other processing logic
-    response = f"Server received: '{message.content}'. This is a dummy response."
-    return {"response": response}
-
-@app.get("/api/example-messages")
-async def get_example_messages():
-    example_messages = [
-        {
-            "heading": "What are the uvicorns?",
-            "subheading": "trending memecoins today?",
-            "message": "What are the trending memecoins today?"
-        },
-        {
-            "heading": "What is the price of",
-            "subheading": "$DOGE right now?",
-            "message": "What is the price of $DOGE right now?"
-        },
-        {
-            "heading": "I would like to buy",
-            "subheading": "42 $DOGE",
-            "message": "I would like to buy 42 $DOGE"
-        },
-        {
-            "heading": "What are some",
-            "subheading": "recent events about $DOGE?",
-            "message": "What are some recent events about $DOGE?"
-        }
-    ]
-    return {"example_messages": example_messages}
+@app.post("/api/run_pipeline")
+async def run_pipeline(question: Question):
+    main_question = question.content
+    pipeline.run(main_question=main_question, iterations=1, num_queries=1)
+    
+    # Get the final answer
+    final_answer = pipeline.latest_answer if pipeline.latest_answer else "No answer generated."
+    
+    return {
+        "question": main_question,
+        "answer": final_answer,
+    }
 
 if __name__ == "__main__":
     import uvicorn

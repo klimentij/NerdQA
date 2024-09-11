@@ -33,7 +33,7 @@ class LiteLLMProxyWrapper:
             )
 
         # init cache
-        self.cache = CacheLLM()
+        # self.cache = CacheLLM()
 
     def completion(self, model: str, messages: List[Dict], mock: bool = False, current_cost: float = 0., prefill: str = None, **kwargs):
             

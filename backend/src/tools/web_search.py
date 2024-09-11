@@ -6,6 +6,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import hashlib
+import urllib.parse
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -20,8 +21,11 @@ class BraveSearchClient:
     def __init__(self):
         self.base_url = "https://api.search.brave.com/res/v1/web/search"
         self.api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
+        if not self.api_key:
+            raise ValueError("BRAVE_SEARCH_API_KEY environment variable is not set")
         self.headers = {
             'X-Subscription-Token': self.api_key,
+            'Accept': 'application/json',
             'Accept-Encoding': 'gzip'
         }
         self.default_params = {
@@ -34,53 +38,24 @@ class BraveSearchClient:
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
         self.cache = LocalCache()
 
-    def search(self, query, **kwargs):
-        """
-        Perform a search using the Brave Search API, with caching.
-
-        Parameters:
-            query (str): The search query.
-            **kwargs: Optional parameters to override default search parameters.
-
-        Returns:
-            dict: The search results wrapped in a dictionary.
-        """
-        start_time = time.time()
-        params = self.default_params.copy()
-        params.update(kwargs)   
-        params['q'] = query
-
-        # Check cache
-        cached_response = self.cache.get(params)
-        if cached_response is not None:
-            logger.debug("Returning cached results")
-            return {"results": cached_response}
-
+    def search(self, query: str) -> dict:
+        encoded_query = urllib.parse.quote(query)
+        url = f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0"
+        
+        logger.debug(f"Sending request to URL: {url}")
+        logger.debug(f"Headers: {self.headers}")
+        
         try:
-            logger.debug(f"Sending search request to Brave API: {params}")
-            response = self.session.get(self.base_url, headers=self.headers, params=params)
+            response = requests.get(url, headers=self.headers)
             response.raise_for_status()
-
-            # Filter results and add IDs
-            filtered_results = self._filter_results(response.json())
-
-            # Add debug log for number of returned results
-            num_results = len(filtered_results)
-            logger.debug(f"Number of returned results: {num_results}")
-
-            # Store filtered results in cache
-            latency = time.time() - start_time
-            logger.debug(f"Received and processed response in {latency:.4f} seconds")
-            self.cache.set(params, filtered_results)
-
-            # Wrap the results in a dictionary
-            return {"results": filtered_results}
+            return response.json()
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTPError during search: {e}")
-            raise
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed: {e}")
-            raise
+            logger.error(f"HTTP error occurred: {e}")
+            logger.error(f"Response content: {e.response.content}")
+            return {"error": str(e), "response_content": e.response.content.decode()}
+        except Exception as e:
+            logger.error(f"An error occurred during web search: {e}")
+            return {"error": str(e)}
 
     def _filter_results(self, response):
         """
