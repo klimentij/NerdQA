@@ -5,7 +5,7 @@ import Textarea from 'react-textarea-autosize'
 
 import { useActions, useUIState } from 'ai/rsc'
 
-import { UserMessage } from './stocks/message'
+import { UserMessage, BotMessage } from './stocks/message'
 import { type AI } from '@/lib/chat/actions'
 import { Button } from '@/components/ui/button'
 import { IconArrowElbow, IconPlus } from '@/components/ui/icons'
@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation'
 
 export function PromptForm({
   input,
-  setInput
+  setInput,
 }: {
   input: string
   setInput: (value: string) => void
@@ -29,7 +29,7 @@ export function PromptForm({
   const { formRef, onKeyDown } = useEnterSubmit()
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const { submitUserMessage } = useActions()
-  const [_, setMessages] = useUIState<typeof AI>()
+  const [messages, setMessages] = useUIState<typeof AI>()
 
   React.useEffect(() => {
     if (inputRef.current) {
@@ -61,9 +61,41 @@ export function PromptForm({
           }
         ])
 
-        // Submit and get response message
-        const responseMessage = await submitUserMessage(value)
-        setMessages(currentMessages => [...currentMessages, responseMessage])
+        try {
+          // Make API call to the backend
+          const response = await fetch('http://localhost:8000/api/run_pipeline', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: value }),
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to get response from server')
+          }
+
+          const data = await response.json()
+
+          // Add the AI response to the messages
+          setMessages(currentMessages => [
+            ...currentMessages,
+            {
+              id: nanoid(),
+              display: <BotMessage content={data.answer} />
+            }
+          ])
+        } catch (error) {
+          console.error('Error:', error)
+          // Handle error (e.g., show an error message to the user)
+          setMessages(currentMessages => [
+            ...currentMessages,
+            {
+              id: nanoid(),
+              display: <BotMessage content="Sorry, I encountered an error. Please try again." />
+            }
+          ])
+        }
       }}
     >
       <div className="relative flex max-h-60 w-full grow flex-col overflow-hidden bg-background px-8 sm:rounded-md sm:border sm:px-12">
