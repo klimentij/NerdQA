@@ -34,7 +34,12 @@ class BraveSearchClient:
             'text_decorations': '0'
         }
         self.session = requests.Session()
-        retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
+        retries = Retry(
+            total=10,
+            backoff_factor=0.1,
+            status_forcelist=[429, 502, 503, 504],
+            respect_retry_after_header=True
+        )
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
         self.cache = LocalCache()
 
@@ -46,10 +51,13 @@ class BraveSearchClient:
         logger.debug(f"Headers: {self.headers}")
         
         try:
-            response = requests.get(url, headers=self.headers)
+            response = self.session.get(url, headers=self.headers)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                logger.warning(f"Rate limit exceeded (429 error). Retrying...")
+                raise
             logger.error(f"HTTP error occurred: {e}")
             logger.error(f"Response content: {e.response.content}")
             return {"error": str(e), "response_content": e.response.content.decode()}

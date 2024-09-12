@@ -2,9 +2,10 @@
 
 import * as React from 'react'
 import Textarea from 'react-textarea-autosize'
+import { useRouter } from 'next/navigation'
+import { nanoid } from 'nanoid'
 
 import { useActions, useUIState } from 'ai/rsc'
-
 import { UserMessage, BotMessage } from './stocks/message'
 import { type AI } from '@/lib/chat/actions'
 import { Button } from '@/components/ui/button'
@@ -15,8 +16,6 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit'
-import { nanoid } from 'nanoid'
-import { useRouter } from 'next/navigation'
 
 export function PromptForm({
   input,
@@ -30,10 +29,53 @@ export function PromptForm({
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const { submitUserMessage } = useActions()
   const [messages, setMessages] = useUIState<typeof AI>()
+  const [socket, setSocket] = React.useState<WebSocket | null>(null)
 
   React.useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus()
+    }
+
+    // Initialize WebSocket connection
+    const ws = new WebSocket('ws://localhost:8000/ws')
+    setSocket(ws)
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      switch (data.type) {
+        case 'queries':
+          setMessages(currentMessages => [
+            ...currentMessages,
+            {
+              id: nanoid(),
+              display: <BotMessage content={`Queries:\n${data.data.join('\n')}`} />
+            }
+          ])
+          break
+        case 'statements':
+          setMessages(currentMessages => [
+            ...currentMessages,
+            {
+              id: nanoid(),
+              display: <BotMessage content={`Statements:\n${data.data.map((stmt: any) => `${stmt.id}: ${stmt.text}`).join('\n')}`} />
+            }
+          ])
+          break
+        case 'answer':
+        case 'final_answer':
+          setMessages(currentMessages => [
+            ...currentMessages,
+            {
+              id: nanoid(),
+              display: <BotMessage content={data.data} />
+            }
+          ])
+          break
+      }
+    }
+
+    return () => {
+      ws.close()
     }
   }, [])
 
@@ -43,7 +85,6 @@ export function PromptForm({
       onSubmit={async (e: any) => {
         e.preventDefault()
 
-        // Blur focus on mobile
         if (window.innerWidth < 600) {
           e.target['message']?.blur()
         }
@@ -52,7 +93,6 @@ export function PromptForm({
         setInput('')
         if (!value) return
 
-        // Optimistically add user message UI
         setMessages(currentMessages => [
           ...currentMessages,
           {
@@ -61,38 +101,19 @@ export function PromptForm({
           }
         ])
 
-        try {
-          // Make API call to the backend
-          const response = await fetch('http://localhost:8000/api/run_pipeline', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content: value }),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to get response from server')
-          }
-
-          const data = await response.json()
-
-          // Add the AI response to the messages
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({
+            question: value,
+            iterations: 1,
+            num_queries: 3
+          }))
+        } else {
+          console.error('WebSocket is not connected')
           setMessages(currentMessages => [
             ...currentMessages,
             {
               id: nanoid(),
-              display: <BotMessage content={data.answer} />
-            }
-          ])
-        } catch (error) {
-          console.error('Error:', error)
-          // Handle error (e.g., show an error message to the user)
-          setMessages(currentMessages => [
-            ...currentMessages,
-            {
-              id: nanoid(),
-              display: <BotMessage content="Sorry, I encountered an error. Please try again." />
+              display: <BotMessage content="Sorry, I'm having trouble connecting to the server. Please try again later." />
             }
           ])
         }
