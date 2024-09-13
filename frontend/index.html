@@ -250,28 +250,43 @@
         /* Responsive styles */
         @media (max-width: 1024px) {
             .report-container {
-                flex-direction: row;
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
             }
 
             #leftPanel {
-                width: 50px;
-            }
-
-            #newButton {
-                width: 30px;
-                height: 30px;
-                font-size: 18px;
+                width: 100%;
+                height: 50px;
+                flex-direction: row;
+                justify-content: flex-start;
+                padding-left: 20px;
             }
 
             #reportContent, 
             #chatContent {
-                flex: none;
                 width: 100%;
+                height: auto;
             }
 
             #chatContent {
                 border-left: none;
                 border-top: 1px solid #eee;
+                position: relative;
+                padding-bottom: 60px; /* Space for fixed input */
+            }
+
+            #chatMessages {
+                max-height: 300px;
+                overflow-y: auto;
+            }
+
+            #chatInput {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background-color: white;
             }
         }
 
@@ -308,6 +323,19 @@
                 width: 25px;
                 height: 25px;
                 font-size: 16px;
+            }
+
+            .report-container {
+                padding-bottom: 60px; /* Space for fixed input */
+            }
+
+            #reportContent, 
+            #chatContent {
+                overflow-y: visible;
+            }
+
+            #chatMessages {
+                max-height: none;
             }
         }
 
@@ -608,6 +636,30 @@
             chatMessages.appendChild(section);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
+
+        // Add this function to handle layout changes
+        function adjustLayout() {
+            const isMobile = window.innerWidth <= 1024;
+            const reportContainer = document.querySelector('.report-container');
+            const chatContent = document.getElementById('chatContent');
+            const chatInput = document.getElementById('chatInput');
+
+            if (isMobile) {
+                reportContainer.style.height = 'auto';
+                reportContainer.style.minHeight = '100vh';
+                chatContent.style.height = 'auto';
+                chatInput.style.position = 'fixed';
+            } else {
+                reportContainer.style.height = '100%';
+                reportContainer.style.minHeight = 'auto';
+                chatContent.style.height = '100%';
+                chatInput.style.position = 'static';
+            }
+        }
+
+        // Call adjustLayout on page load and window resize
+        window.addEventListener('load', adjustLayout);
+        window.addEventListener('resize', adjustLayout);
 
         connectWebSocket();
     </script>
