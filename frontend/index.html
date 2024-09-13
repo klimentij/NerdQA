@@ -120,23 +120,40 @@
             margin-bottom: 20px;
         }
 
-        #backButton {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            padding: 10px 15px;
-            font-size: 14px;
+        #leftPanel {
+            width: 60px;
             background-color: #f0f0f0;
-            color: #333;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
         }
 
-        #backButton:hover {
-            background-color: #e0e0e0;
+        #newButton {
+            width: 40px;
+            height: 40px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            transition: background-color 0.3s;
+            line-height: 1;
+            padding: 0;
+            text-align: center;
+        }
+
+        #newButton span {
+            display: inline-block;
+            margin-top: -2px;
+        }
+
+        #newButton:hover {
+            background-color: #45a049;
         }
 
         .citation-tree {
@@ -207,7 +224,17 @@
         /* Responsive styles */
         @media (max-width: 1024px) {
             .report-container {
-                flex-direction: column;
+                flex-direction: row;
+            }
+
+            #leftPanel {
+                width: 50px;
+            }
+
+            #newButton {
+                width: 30px;
+                height: 30px;
+                font-size: 18px;
             }
 
             #reportContent, 
@@ -247,9 +274,14 @@
                 font-size: 16px;
             }
 
-            #backButton {
-                padding: 8px 12px;
-                font-size: 12px;
+            #leftPanel {
+                width: 40px;
+            }
+
+            #newButton {
+                width: 25px;
+                height: 25px;
+                font-size: 16px;
             }
         }
     </style>
@@ -265,8 +297,10 @@
     </div>
 
     <div id="reportScreen">
-        <button id="backButton">Back to Question</button>
         <div class="report-container">
+            <div id="leftPanel">
+                <button id="newButton"><span>+</span></button>
+            </div>
             <div id="reportContent">
                 <!-- Report content will be dynamically inserted here -->
             </div>
@@ -287,7 +321,7 @@
         const reportContent = document.getElementById('reportContent');
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
-        const backButton = document.getElementById('backButton');
+        const newButton = document.getElementById('newButton');
 
         let socket;
         let currentIteration = 0;
@@ -493,7 +527,7 @@
             }
         });
 
-        backButton.addEventListener('click', () => {
+        newButton.addEventListener('click', () => {
             reportScreen.style.display = 'none';
             questionScreen.style.display = 'flex';
             questionInput.value = '';
