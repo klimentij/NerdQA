@@ -10,16 +10,19 @@
             margin: 0;
             padding: 0;
         }
+
         body, html {
             font-family: Arial, sans-serif;
             height: 100%;
             background-color: #f5f5f5;
         }
+
         #questionScreen, #reportScreen {
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
+
         .container {
             width: 100%;
             max-width: 800px;
@@ -29,11 +32,13 @@
             display: flex;
             flex-direction: column;
         }
+
         h1 {
             text-align: center;
             color: #333;
             margin-bottom: 20px;
         }
+
         #questionInput {
             width: 100%;
             padding: 15px;
@@ -42,6 +47,7 @@
             border-radius: 4px;
             margin-bottom: 10px;
         }
+
         #submitQuestion {
             padding: 15px 20px;
             font-size: 16px;
@@ -52,34 +58,45 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
+
         #submitQuestion:hover {
             background-color: #45a049;
         }
+
         #reportScreen {
             display: none;
         }
+
         .report-container {
             display: flex;
             height: 100%;
             background-color: white;
+            gap: 20px;
         }
+
         #reportContent {
             flex: 2;
-            padding: 20px;
+            padding: 30px;
             overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.6;
         }
+
         #chatContent {
             flex: 1;
             display: flex;
             flex-direction: column;
             border-left: 1px solid #eee;
             background-color: #f9f9f9;
+            font-size: 14px;
         }
+
         #chatMessages {
             flex-grow: 1;
             overflow-y: auto;
             padding: 20px;
         }
+
         #chatInput {
             width: 100%;
             padding: 15px;
@@ -87,18 +104,22 @@
             border: none;
             border-top: 1px solid #eee;
         }
+
         .report-title {
-            font-size: 24px;
-            margin-bottom: 20px;
+            font-size: 28px;
+            margin-bottom: 30px;
         }
+
         .report-subtitle {
-            font-size: 18px;
-            margin-top: 15px;
-            margin-bottom: 10px;
+            font-size: 22px;
+            margin-top: 25px;
+            margin-bottom: 15px;
         }
+
         .report-content p {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
+
         #backButton {
             position: fixed;
             top: 10px;
@@ -113,35 +134,36 @@
             transition: background-color 0.3s;
             z-index: 1000;
         }
+
         #backButton:hover {
             background-color: #e0e0e0;
         }
-        @media (max-width: 1024px) {
-            .report-container {
-                flex-direction: column;
-            }
-            #reportContent, #chatContent {
-                flex: none;
-                width: 100%;
-            }
-            #chatContent {
-                border-left: none;
-                border-top: 1px solid #eee;
-            }
-        }
+
         .citation-tree {
-            display: none;
             background-color: #f9f9f9;
             border: 1px solid #ddd;
-            margin: 10px 0;
-            padding: 15px;
-        }
-        .citation-tree.active {
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 5px;
             display: block;
         }
+
+        .citation-tree.hidden {
+            display: none;
+        }
+
+        .citation-tree ul {
+            padding-left: 20px;
+        }
+
+        .citation-tree li {
+            margin-bottom: 10px;
+        }
+
         .tree-content {
             position: relative;
         }
+
         .hide-tree {
             position: absolute;
             top: 5px;
@@ -151,10 +173,73 @@
             border: none;
             cursor: pointer;
         }
+
         .citation {
             color: #0066cc;
             text-decoration: none;
             cursor: pointer;
+        }
+
+        #chatMessages > div {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        #chatMessages h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        /* Responsive styles */
+        @media (max-width: 1024px) {
+            .report-container {
+                flex-direction: column;
+            }
+
+            #reportContent, 
+            #chatContent {
+                flex: none;
+                width: 100%;
+            }
+
+            #chatContent {
+                border-left: none;
+                border-top: 1px solid #eee;
+            }
+        }
+
+        /* Additional responsive adjustments */
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            #questionInput,
+            #submitQuestion,
+            #chatInput {
+                font-size: 14px;
+                padding: 10px;
+            }
+
+            .report-title {
+                font-size: 20px;
+            }
+
+            .report-subtitle {
+                font-size: 16px;
+            }
+
+            #backButton {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -314,6 +399,7 @@
                             <ul>${treeHtml}</ul>
                         </div>
                     `;
+                    treeContainer.classList.add('hidden'); // Start with all trees hidden
                 }
             });
 
@@ -324,23 +410,23 @@
                     const treeId = `tree-${e.target.dataset.id}`;
                     const tree = document.getElementById(treeId);
                     
-                    // Close all other open trees
-                    document.querySelectorAll('.citation-tree.active').forEach(openTree => {
-                        if (openTree.id !== treeId) {
-                            openTree.classList.remove('active');
-                        }
-                    });
-
-                    // Toggle the clicked tree
                     if (tree) {
-                        tree.classList.toggle('active');
+                        // Close all other open trees
+                        document.querySelectorAll('.citation-tree:not(.hidden)').forEach(openTree => {
+                            if (openTree.id !== treeId) {
+                                openTree.classList.add('hidden');
+                            }
+                        });
+
+                        // Toggle the clicked tree
+                        tree.classList.toggle('hidden');
                     }
                 });
             });
 
             document.querySelectorAll('.hide-tree').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    e.target.closest('.citation-tree').classList.remove('active');
+                    e.target.closest('.citation-tree').classList.add('hidden');
                 });
             });
         }
