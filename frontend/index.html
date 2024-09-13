@@ -390,6 +390,12 @@
             node.children.forEach(updateEvidenceFromTree);
         }
 
+        function closeAllCitationTrees() {
+            document.querySelectorAll('.citation-tree').forEach(tree => {
+                tree.classList.add('hidden');
+            });
+        }
+
         function updateCitationTrees(fullCitationTree) {
             Object.entries(fullCitationTree).forEach(([stmtId, tree]) => {
                 const treeContainer = document.getElementById(`tree-${stmtId}`);
@@ -414,6 +420,9 @@
                     const tree = document.getElementById(treeId);
                     
                     if (tree) {
+                        if (tree.classList.contains('hidden')) {
+                            closeAllCitationTrees(); // Close all trees before toggling the clicked one
+                        }
                         tree.classList.toggle('hidden');
                     }
                 });
