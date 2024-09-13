@@ -237,6 +237,16 @@
             margin-bottom: 10px;
         }
 
+        /* New styles for chat message lists */
+        #chatMessages ul, #chatMessages ol {
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        #chatMessages li {
+            margin-bottom: 5px;
+        }
+
         /* Responsive styles */
         @media (max-width: 1024px) {
             .report-container {
@@ -411,18 +421,28 @@
                 updateEvidenceFromTree(fullCitationTree[stmtId]);
             });
 
-            const processedAnswer = processAnswer(answer, summary);
+            const processedAnswer = processAnswer(answer);
             
             reportContent.innerHTML = `
-                <h2 class="report-title">Report for: "${questionInput.value}"</h2>
+                <h2 class="report-title">${questionInput.value}</h2>
                 <h3>Iteration ${iteration} Answer</h3>
                 ${processedAnswer}
             `;
 
             updateCitationTrees(fullCitationTree);
+
+            // Add summary to chat
+            const summaryHtml = `
+                <ul>
+                    <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
+                    <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
+                    <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
+                </ul>
+            `;
+            appendToChat(`Iteration ${iteration} Summary`, summaryHtml);
         }
 
-        function processAnswer(answer, summary) {
+        function processAnswer(answer) {
             // First, convert Markdown to HTML
             let html = marked.parse(answer);
 
@@ -433,16 +453,6 @@
                 }
                 return match;
             });
-
-            // Add summary
-            html += `
-                <h3>Iteration Summary</h3>
-                <ul>
-                    <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
-                    <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
-                    <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
-                </ul>
-            `;
 
             return html;
         }
