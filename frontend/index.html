@@ -257,16 +257,32 @@
 
             #leftPanel {
                 width: 100%;
-                height: 50px;
+                height: 60px;
                 flex-direction: row;
-                justify-content: flex-start;
-                padding-left: 20px;
+                justify-content: flex-start; /* Change to flex-start to align left */
+                padding: 10px 20px;
+                position: fixed;
+                top: 0;
+                left: 0;
+                background-color: #f0f0f0;
+                z-index: 1000;
+            }
+
+            #newButton {
+                width: 40px;
+                height: 40px;
+                margin-right: auto; /* Push other items to the right */
             }
 
             #reportContent, 
             #chatContent {
                 width: 100%;
                 height: auto;
+                margin-top: 60px; /* Add space for fixed top panel */
+            }
+
+            #reportContent {
+                padding-top: 20px;
             }
 
             #chatContent {
@@ -290,7 +306,7 @@
             }
         }
 
-        /* Additional responsive adjustments */
+        /* Add more specific styles for smaller screens if needed */
         @media (max-width: 600px) {
             .container {
                 padding: 10px;
@@ -316,17 +332,19 @@
             }
 
             #leftPanel {
-                width: 40px;
+                height: 50px;
+                padding: 5px 10px;
             }
 
             #newButton {
-                width: 25px;
-                height: 25px;
-                font-size: 16px;
+                width: 30px;
+                height: 30px;
+                font-size: 20px;
             }
 
-            .report-container {
-                padding-bottom: 60px; /* Space for fixed input */
+            #reportContent, 
+            #chatContent {
+                margin-top: 50px;
             }
 
             #reportContent, 
