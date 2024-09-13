@@ -48,6 +48,22 @@
             margin-bottom: 10px;
         }
 
+        .preferences {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .preferences label {
+            margin-right: 5px;
+        }
+
+        .preferences input {
+            width: 50px;
+            padding: 5px;
+            margin-right: 15px;
+        }
+
         #submitQuestion {
             padding: 15px 20px;
             font-size: 16px;
@@ -292,6 +308,12 @@
         <div class="container">
             <h1>Researcher Q&A</h1>
             <input type="text" id="questionInput" placeholder="Ask your research question...">
+            <div class="preferences">
+                <label for="iterationsInput">Iterations:</label>
+                <input type="number" id="iterationsInput" value="1" min="1" max="10">
+                <label for="queriesInput">Number of Queries:</label>
+                <input type="number" id="queriesInput" value="1" min="1" max="5">
+            </div>
             <button id="submitQuestion">Submit Question</button>
         </div>
     </div>
@@ -322,6 +344,8 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const newButton = document.getElementById('newButton');
+        const iterationsInput = document.getElementById('iterationsInput');
+        const queriesInput = document.getElementById('queriesInput');
 
         let socket;
         let currentIteration = 0;
@@ -504,11 +528,14 @@
 
         function submitQuestionHandler() {
             const question = questionInput.value.trim();
+            const iterations = parseInt(iterationsInput.value, 10);
+            const numQueries = parseInt(queriesInput.value, 10);
+
             if (question && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     question: question,
-                    iterations: 1,
-                    num_queries: 1
+                    iterations: iterations,
+                    num_queries: numQueries
                 }));
                 questionScreen.style.display = 'none';
                 reportScreen.style.display = 'flex';
