@@ -68,27 +68,27 @@ class PipelineOrchestrator:
                 metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
         return metadata
 
-    async def generate_statements(self, main_question: str, current_query: str, previous_queries_and_statements: str, iteration: int, query_index: int):
+    async def generate_statements(self, main_question: str, current_query: str, history: str, iteration: int, query_index: int):
         metadata = self.get_metadata(iteration, query_index)
         statements, search_results = await asyncio.to_thread(
             self.statement_generator.generate_statements,
-            main_question, current_query, previous_queries_and_statements, metadata
+            main_question, current_query, history, metadata
         )
         return statements, search_results
 
-    async def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, current_best_answer: str, num_queries: int, iteration: int):
+    async def generate_next_queries(self, main_question: str, history: str, current_best_answer: str, num_queries: int, iteration: int):
         metadata = self.get_metadata(iteration)
         next_queries = await asyncio.to_thread(
             self.query_generator.generate_next_queries,
-            main_question, previous_queries_and_statements, current_best_answer, num_queries, metadata
+            main_question, history, current_best_answer, num_queries, metadata
         )
         return next_queries
 
-    async def generate_answer(self, main_question: str, research_history: str, iteration: int):
+    async def generate_answer(self, main_question: str, history: str, iteration: int):
         metadata = self.get_metadata(iteration)
         answer = await asyncio.to_thread(
             self.answer_generator.generate_answer,
-            main_question, research_history, metadata
+            main_question, history, metadata
         )
         return answer
 
@@ -115,7 +115,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info("WebSocket disconnected")
 
 async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int):
-    previous_queries_and_statements = ""
+    history = ""
     orchestrator.main_question = main_question
     all_statements = {}
     all_evidence = {}
@@ -126,7 +126,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
     for iteration in range(iterations):
         # Generate queries
         next_queries = await orchestrator.generate_next_queries(
-            main_question, previous_queries_and_statements, "", num_queries, iteration
+            main_question, history, "", num_queries, iteration
         )
         await websocket.send_json({
             "type": "queries",
@@ -142,7 +142,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
         # Process queries and generate statements
         for query_index, current_query in enumerate(next_queries, 1):
             statements, search_results = await orchestrator.generate_statements(
-                main_question, current_query, previous_queries_and_statements, iteration, query_index
+                main_question, current_query, history, iteration, query_index
             )
             
             # Process search results and statements
@@ -180,13 +180,13 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
                 "query_index": query_index
             })
 
-            previous_queries_and_statements += f"\nQuery: {current_query}\n"
+            history += f"\nQuery: {current_query}\n"
             for stmt in statements:
-                previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
+                history += f"Statement {stmt['id']}: {stmt['text']}\n"
 
         # Generate answer
         answer = await orchestrator.generate_answer(
-            main_question, previous_queries_and_statements, iteration
+            main_question, history, iteration
         )
 
         # Extract cited statements from the answer

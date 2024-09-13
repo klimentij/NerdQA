@@ -9,7 +9,7 @@ You are a senior researcher reviewing the work of your junior colleagues. Your t
 
 ### Research History
 This includes all queries, statements, and evidence collected so far.
-"""{{$RESEARCH_HISTORY}}"""
+"""{{$HISTORY}}"""
 
 ## Task: Best Possible Answer Synthesis
 

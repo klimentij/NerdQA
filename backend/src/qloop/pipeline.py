@@ -27,7 +27,7 @@ class StatementGenerator:
         self.web_search = BraveSearchClient()
         self.skill = Completion(('QLoop', 'Statements'))
 
-    def generate_statements(self, main_question: str, current_query: str, previous_queries_and_statements: str, metadata: dict) -> Tuple[List[dict], dict]:
+    def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict) -> Tuple[List[dict], dict]:
         logger.info(f"Generating statements for query: {current_query}")
         
         search_results = self.web_search.search(current_query)
@@ -38,7 +38,7 @@ class StatementGenerator:
                 "MAIN_QUESTION": main_question,
                 "QUERY": current_query,
                 "SEARCH_RESULTS": json.dumps(filtered_results),
-                "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements
+                "HISTORY": history
             },
             completion_kwargs={"metadata": metadata}
         )
@@ -67,13 +67,13 @@ class QueryGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Query'))
 
-    def generate_next_queries(self, main_question: str, previous_queries_and_statements: str, current_best_answer: str, num_queries: int, metadata: dict) -> List[str]:
+    def generate_next_queries(self, main_question: str, history: str, current_best_answer: str, num_queries: int, metadata: dict) -> List[str]:
         logger.info(f"Generating next {num_queries} queries")
         
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
-                "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements,
+                "HISTORY": history,
                 "CURRENT_BEST_ANSWER": current_best_answer,
                 "NUM_QUERIES": num_queries
             },
@@ -99,13 +99,13 @@ class AnswerGenerator:
     def __init__(self):
         self.skill = Completion(('QLoop', 'Answer'))
 
-    def generate_answer(self, main_question: str, research_history: str, metadata: dict) -> str:
+    def generate_answer(self, main_question: str, history: str, metadata: dict) -> str:
         logger.info("Generating research answer")
         
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
-                "RESEARCH_HISTORY": research_history
+                "HISTORY": history
             },
             completion_kwargs={"metadata": metadata}
         )
@@ -148,7 +148,7 @@ class Pipeline:
     def run(self, main_question: str, iterations: int, num_queries: int) -> None:
         self.main_question = main_question
         self.metadata = self.get_metadata()
-        previous_queries_and_statements = ""
+        history = ""
 
         output_folder = os.path.join(os.getcwd(), "output")
         os.makedirs(output_folder, exist_ok=True)
@@ -170,7 +170,7 @@ class Pipeline:
                 )
             else:
                 current_queries = self.query_generator.generate_next_queries(
-                    main_question, previous_queries_and_statements, self.latest_answer, num_queries, metadata
+                    main_question, history, self.latest_answer, num_queries, metadata
                 )
 
             new_evidence_found = 0
@@ -184,7 +184,7 @@ class Pipeline:
                 metadata['generation_name_suffix'] = f" [It{iteration+1} Q{query_index}]"
 
                 statements, search_results = self.statement_generator.generate_statements(
-                    main_question, current_query, previous_queries_and_statements, metadata
+                    main_question, current_query, history, metadata
                 )
                 
                 # Count all search results as evidence found
@@ -208,12 +208,12 @@ class Pipeline:
                             evidence_data = self.get_snippet_text(evidence, search_results)
                             self.all_evidence[evidence] = evidence_data
 
-                previous_queries_and_statements += f"\nQuery: {current_query}\n"
+                history += f"\nQuery: {current_query}\n"
                 if statements:
                     for stmt in statements:
-                        previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
+                        history += f"Statement {stmt['id']}: {stmt['text']}\n"
                 else:
-                    previous_queries_and_statements += "No relevant evidence was found for this query, so no statements were generated.\n"
+                    history += "No relevant evidence was found for this query, so no statements were generated.\n"
 
                 print(f"Iteration {iteration + 1}, Query '{current_query}' processed")
 
@@ -233,7 +233,7 @@ class Pipeline:
             metadata = self.get_metadata()
             metadata['generation_name_suffix'] = f" [It{iteration+1}]"
             answer = self.answer_generator.generate_answer(
-                main_question, previous_queries_and_statements, metadata
+                main_question, history, metadata
             )
             if answer:
                 self.latest_answer = answer

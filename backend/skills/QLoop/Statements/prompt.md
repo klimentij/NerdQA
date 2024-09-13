@@ -14,12 +14,12 @@ This is the raw information retrieved from our search based on the current quest
 {{$SEARCH_RESULTS}}
 """
 
-## Previous Queries and Statements
+## History
 
 This is a comprehensive record of all the queries we've used so far and the key findings from each, including the most recent ones. It represents the cumulative knowledge we've gathered throughout our investigation, including our latest insights and current focus.
 
 """
-{{$PREVIOUS_QUERIES_AND_STATEMENTS}}
+{{$HISTORY}}
 """
 
 Your task will be completed in two steps:

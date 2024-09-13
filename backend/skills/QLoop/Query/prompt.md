@@ -15,7 +15,7 @@ This is the overarching question that guides our entire investigation. All sub-q
 This is a comprehensive record of all the queries we've used so far and the key findings from each, including the most recent ones. It represents the cumulative knowledge we've gathered throughout our investigation, including our latest insights and current focus.
 
 """
-{{$PREVIOUS_QUERIES_AND_STATEMENTS}}
+{{$HISTORY}}
 """
 
 ## Current Best Answer
