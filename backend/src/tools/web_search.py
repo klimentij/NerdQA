@@ -53,7 +53,9 @@ class BraveSearchClient:
         try:
             response = self.session.get(url, headers=self.headers)
             response.raise_for_status()
-            return response.json()
+            raw_results = response.json()
+            filtered_results = self._filter_results(raw_results)
+            return {"results": filtered_results}
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:
                 logger.warning(f"Rate limit exceeded (429 error). Retrying...")

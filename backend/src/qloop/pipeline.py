@@ -31,12 +31,13 @@ class StatementGenerator:
         logger.info(f"Generating statements for query: {current_query}")
         
         search_results = self.web_search.search(current_query)
+        filtered_results = search_results.get('results', [])
 
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
                 "QUERY": current_query,
-                "SEARCH_RESULTS": json.dumps(search_results),
+                "SEARCH_RESULTS": json.dumps(filtered_results),
                 "PREVIOUS_QUERIES_AND_STATEMENTS": previous_queries_and_statements
             },
             completion_kwargs={"metadata": metadata}
@@ -51,7 +52,7 @@ class StatementGenerator:
                 statement['id'] = f"S{statement_hash % 10**STATEMENT_ID_DIGITS:0{STATEMENT_ID_DIGITS}d}"
             
             logger.info(f"Generated {len(statements)} statements")
-            return statements, search_results
+            return statements, filtered_results
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
             return [], {}
@@ -187,7 +188,7 @@ class Pipeline:
                 )
                 
                 # Count all search results as evidence found
-                for result in search_results.get('results', []):
+                for result in search_results:
                     evidence_id = result.get('id')
                     if evidence_id and evidence_id not in self.all_evidence_ids:
                         new_evidence_found += 1
@@ -257,7 +258,7 @@ class Pipeline:
     def get_snippet_text(self, snippet_id: str, search_results: dict) -> dict:
         if snippet_id.startswith('S'):
             return self.all_statements.get(snippet_id, {"text": "Statement text not found", "meta": {}})
-        for result in search_results.get('results', []):
+        for result in search_results:
             if result.get('id') == snippet_id:
                 return {
                     "text": result.get('text', ''),

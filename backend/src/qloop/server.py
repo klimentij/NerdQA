@@ -146,7 +146,14 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             )
             
             # Process search results and statements
-            for result in search_results.get('results', []):
+            if isinstance(search_results, list):
+                results = search_results
+            elif isinstance(search_results, dict):
+                results = search_results.get('results', [])
+            else:
+                results = []
+
+            for result in results:
                 evidence_id = result.get('id')
                 if evidence_id and evidence_id not in all_evidence_ids:
                     new_evidence_found += 1
@@ -162,7 +169,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
                             new_evidence_used += 1
                             used_evidence_ids.add(evidence)
                         iteration_evidence_ids.add(evidence)
-                        evidence_data = next((result for result in search_results.get('results', []) if result.get('id') == evidence), None)
+                        evidence_data = next((result for result in results if result.get('id') == evidence), None)
                         if evidence_data:
                             all_evidence[evidence] = evidence_data
 
