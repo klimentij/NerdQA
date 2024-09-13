@@ -310,8 +310,27 @@
                 font-size: 16px;
             }
         }
+
+        .report-status {
+            font-size: 16px;
+            margin-bottom: 20px;
+            font-weight: normal;
+        }
+
+        .report-status i {
+            margin-right: 10px;
+        }
+
+        .report-status.draft {
+            color: #f39c12;
+        }
+
+        .report-status.final {
+            color: #2ecc71;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 </head>
 <body>
     <div id="questionScreen">
@@ -423,9 +442,22 @@
 
             const processedAnswer = processAnswer(answer);
             
+            const totalIterations = parseInt(iterationsInput.value, 10);
+            let reportStatus, statusClass;
+            if (iteration === totalIterations) {
+                reportStatus = 'Final report';
+                statusClass = 'final';
+            } else {
+                reportStatus = `Report draft: Iteration ${iteration} of ${totalIterations}`;
+                statusClass = 'draft';
+            }
+            
             reportContent.innerHTML = `
                 <h2 class="report-title">${questionInput.value}</h2>
-                <h3>Iteration ${iteration} Answer</h3>
+                <h3 class="report-status ${statusClass}">
+                    <i class="fas ${iteration === totalIterations ? 'fa-check-circle' : 'fa-sync fa-spin'}"></i>
+                    ${reportStatus}
+                </h3>
                 ${processedAnswer}
             `;
 
