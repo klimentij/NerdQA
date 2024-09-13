@@ -116,7 +116,7 @@
         #backButton:hover {
             background-color: #e0e0e0;
         }
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .report-container {
                 flex-direction: column;
             }
@@ -129,27 +129,32 @@
                 border-top: 1px solid #eee;
             }
         }
-        #citationTrees {
-            margin-top: 20px;
-        }
         .citation-tree {
-            margin-bottom: 20px;
-        }
-        .citation-tree ul {
-            list-style-type: none;
-        }
-        .citation-tree li {
+            display: none;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
             margin: 10px 0;
+            padding: 15px;
         }
-        .back-to-top {
-            display: inline-block;
-            margin-top: 10px;
-            text-decoration: none;
-            color: #0066cc;
+        .citation-tree.active {
+            display: block;
+        }
+        .tree-content {
+            position: relative;
+        }
+        .hide-tree {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border: none;
+            cursor: pointer;
         }
         .citation {
             color: #0066cc;
             text-decoration: none;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -167,9 +172,6 @@
         <div class="report-container">
             <div id="reportContent">
                 <!-- Report content will be dynamically inserted here -->
-            </div>
-            <div id="citationTrees">
-                <!-- Citation trees will be dynamically inserted here -->
             </div>
             <div id="chatContent">
                 <div id="chatMessages">
@@ -268,12 +270,8 @@
         }
 
         function processAnswer(answer, summary) {
-            let html = answer;
-            const citations = answer.match(/\[(S\d+|E\d+)\]/g) || [];
-            
-            citations.forEach(citation => {
-                const id = citation.slice(1, -1);
-                html = html.replace(citation, `<a href="#tree-${id}" class="citation" id="cite-${id}">${citation}</a>`);
+            let html = answer.replace(/\[(S\d+|E\d+)\]/g, (match, id) => {
+                return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
             });
 
             html += `
@@ -299,18 +297,45 @@
         }
 
         function updateCitationTrees(fullCitationTree) {
-            const citationTreesContainer = document.getElementById('citationTrees');
-            citationTreesContainer.innerHTML = '';
-
             Object.entries(fullCitationTree).forEach(([stmtId, tree]) => {
-                const treeHtml = renderCitationTree(tree);
-                citationTreesContainer.innerHTML += `
-                    <div class="citation-tree" id="tree-${stmtId}">
-                        <h3>Citation Tree for Statement ${stmtId}</h3>
-                        <ul>${treeHtml}</ul>
-                        <a href="#cite-${stmtId}" class="back-to-top">↑ Back to citation</a>
-                    </div>
-                `;
+                const treeContainer = document.getElementById(`tree-${stmtId}`);
+                if (treeContainer) {
+                    const treeHtml = renderCitationTree(tree);
+                    treeContainer.innerHTML = `
+                        <div class="tree-content">
+                            <button class="hide-tree">Hide</button>
+                            <h3>Citation Tree for ${stmtId}</h3>
+                            <ul>${treeHtml}</ul>
+                        </div>
+                    `;
+                }
+            });
+
+            // Add event listeners for citations and hide buttons
+            document.querySelectorAll('.citation').forEach(citation => {
+                citation.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const treeId = `tree-${e.target.dataset.id}`;
+                    const tree = document.getElementById(treeId);
+                    
+                    // Close all other open trees
+                    document.querySelectorAll('.citation-tree.active').forEach(openTree => {
+                        if (openTree.id !== treeId) {
+                            openTree.classList.remove('active');
+                        }
+                    });
+
+                    // Toggle the clicked tree
+                    if (tree) {
+                        tree.classList.toggle('active');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.hide-tree').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.target.closest('.citation-tree').classList.remove('active');
+                });
             });
         }
 
