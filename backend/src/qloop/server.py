@@ -1,3 +1,10 @@
+"""
+To start the server, run:
+
+uvicorn src.qloop.server:app --reload
+
+"""
+
 import asyncio
 import json
 import os
