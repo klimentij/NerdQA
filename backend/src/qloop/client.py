@@ -14,9 +14,10 @@ logger = setup_logging(__file__)
 
 # Configuration
 WEBSOCKET_URI = "ws://localhost:8000/ws"
-MAIN_QUESTION = "What are the main causes of climate change???"
+MAIN_QUESTION = "What are the main causes of climate change?"
 ITERATIONS = 1
-NUM_QUERIES = 5
+NUM_QUERIES = 2
+TIMEOUT = 60  # Timeout in seconds
 
 async def connect_websocket():
     try:
@@ -33,40 +34,27 @@ async def connect_websocket():
             logger.info(f"Queries per iteration: {NUM_QUERIES}")
             logger.info("Waiting for server responses...")
 
-            while True:
-                message = await websocket.recv()
-                data = json.loads(message)
-                
-                if 'error' in data:
-                    logger.error(f"Error: {data['error']}")
-                    break
-                
-                if data['type'] == 'queries':
-                    logger.info("Generated queries:")
-                    for i, query in enumerate(data['data'], 1):
-                        logger.info(f"  {i}. {query}")
-                
-                elif data['type'] == 'statements':
-                    logger.info("Generated statements:")
-                    for i, statement in enumerate(data['data'], 1):
-                        logger.info(f"  {i}. [ID: {statement['id']}] {statement['text']}")
-                
-                elif data['type'] == 'answer':
-                    logger.info("Intermediate answer:")
-                    logger.info(data['data'])
-                
-                elif data['type'] == 'final_answer':
-                    logger.info("Final answer:")
-                    logger.info(data['data'])
-                    logger.info("Pipeline completed successfully.")
-                    break
-                
-                else:
-                    logger.warning(f"Unknown message type: {data['type']}")
-                    logger.info(data['data'])
+            try:
+                while True:
+                    try:
+                        message = await asyncio.wait_for(websocket.recv(), timeout=TIMEOUT)
+                        parsed_message = json.loads(message)
+                        message_type = parsed_message.get("type")
+                        
+                        logger.info(f"Received message type: {message_type}")
+                        logger.info(f"Message content: {parsed_message}")
 
-    except websockets.exceptions.ConnectionClosedOK:
-        logger.info("WebSocket connection closed normally.")
+                        if message_type == "final_answer":
+                            logger.info("Received final answer. Closing connection.")
+                            break
+
+                    except asyncio.TimeoutError:
+                        logger.warning(f"No message received for {TIMEOUT} seconds. Closing connection.")
+                        break
+
+            except websockets.exceptions.ConnectionClosed:
+                logger.info("WebSocket connection closed by the server.")
+
     except Exception as e:
         logger.error(f"An error occurred: {e}")
 

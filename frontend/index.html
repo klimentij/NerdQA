@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Researcher Q&A</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            font-family: Arial, sans-serif;
+            height: 100%;
+            background-color: #f5f5f5;
+        }
+        #questionScreen, #reportScreen {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #questionInput {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        #submitQuestion {
+            padding: 15px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #submitQuestion:hover {
+            background-color: #45a049;
+        }
+        #reportScreen {
+            display: none;
+        }
+        .report-container {
+            display: flex;
+            height: 100%;
+            background-color: white;
+        }
+        #reportContent {
+            flex: 2;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #chatContent {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #eee;
+            background-color: #f9f9f9;
+        }
+        #chatMessages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #chatInput {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: none;
+            border-top: 1px solid #eee;
+        }
+        .report-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .report-subtitle {
+            font-size: 18px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+        .report-content p {
+            margin-bottom: 10px;
+        }
+        #backButton {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 10px 15px;
+            font-size: 14px;
+            background-color: #f0f0f0;
+            color: #333;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 1000;
+        }
+        #backButton:hover {
+            background-color: #e0e0e0;
+        }
+        @media (max-width: 768px) {
+            .report-container {
+                flex-direction: column;
+            }
+            #reportContent, #chatContent {
+                flex: none;
+                width: 100%;
+            }
+            #chatContent {
+                border-left: none;
+                border-top: 1px solid #eee;
+            }
+        }
+        #citationTrees {
+            margin-top: 20px;
+        }
+        .citation-tree {
+            margin-bottom: 20px;
+        }
+        .citation-tree ul {
+            list-style-type: none;
+        }
+        .citation-tree li {
+            margin: 10px 0;
+        }
+        .back-to-top {
+            display: inline-block;
+            margin-top: 10px;
+            text-decoration: none;
+            color: #0066cc;
+        }
+        .citation {
+            color: #0066cc;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="questionScreen">
+        <div class="container">
+            <h1>Researcher Q&A</h1>
+            <input type="text" id="questionInput" placeholder="Ask your research question...">
+            <button id="submitQuestion">Submit Question</button>
+        </div>
+    </div>
+
+    <div id="reportScreen">
+        <button id="backButton">Back to Question</button>
+        <div class="report-container">
+            <div id="reportContent">
+                <!-- Report content will be dynamically inserted here -->
+            </div>
+            <div id="citationTrees">
+                <!-- Citation trees will be dynamically inserted here -->
+            </div>
+            <div id="chatContent">
+                <div id="chatMessages">
+                    <!-- Chat messages will be inserted here -->
+                </div>
+                <input type="text" id="chatInput" placeholder="Type your feedback...">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const questionScreen = document.getElementById('questionScreen');
+        const reportScreen = document.getElementById('reportScreen');
+        const questionInput = document.getElementById('questionInput');
+        const submitQuestion = document.getElementById('submitQuestion');
+        const reportContent = document.getElementById('reportContent');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const backButton = document.getElementById('backButton');
+
+        let socket;
+        let currentIteration = 0;
+        let allStatements = {};
+        let allEvidence = {};
+
+        function connectWebSocket() {
+            socket = new WebSocket('ws://localhost:8000/ws');
+
+            socket.onopen = function(e) {
+                console.log("WebSocket connection established");
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+
+            socket.onclose = function(event) {
+                console.log("WebSocket connection closed");
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            socket.onerror = function(error) {
+                console.error("WebSocket error:", error);
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'queries':
+                    displayQueries(data.data, data.iteration);
+                    break;
+                case 'statements':
+                    displayStatements(data.data, data.iteration);
+                    break;
+                case 'answer':
+                    displayAnswer(data.data, data.iteration, data.summary, data.full_citation_tree);
+                    break;
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        }
+
+        function displayQueries(queries, iteration) {
+            const queriesHtml = queries.map((query, index) => `<p><strong>Query ${index + 1}:</strong> ${query}</p>`).join('');
+            appendToChat(`Iteration ${iteration} - Queries`, queriesHtml);
+        }
+
+        function displayStatements(statements, iteration) {
+            statements.forEach(stmt => {
+                allStatements[stmt.id] = stmt;
+            });
+            const statementsHtml = statements.map(stmt => `<p><strong>Statement ${stmt.id}:</strong> ${stmt.text}</p>`).join('');
+            appendToChat(`Iteration ${iteration} - Statements`, statementsHtml);
+        }
+
+        function displayAnswer(answer, iteration, summary, fullCitationTree) {
+            currentIteration = iteration;
+            
+            // Update allEvidence with new evidence
+            Object.keys(fullCitationTree).forEach(stmtId => {
+                updateEvidenceFromTree(fullCitationTree[stmtId]);
+            });
+
+            const processedAnswer = processAnswer(answer, summary);
+            
+            reportContent.innerHTML = `
+                <h2 class="report-title">Report for: "${questionInput.value}"</h2>
+                <h3>Iteration ${iteration} Answer</h3>
+                ${processedAnswer}
+            `;
+
+            updateCitationTrees(fullCitationTree);
+
+            appendToChat(`Iteration ${iteration} - Answer`, answer);
+        }
+
+        function processAnswer(answer, summary) {
+            let html = answer;
+            const citations = answer.match(/\[(S\d+|E\d+)\]/g) || [];
+            
+            citations.forEach(citation => {
+                const id = citation.slice(1, -1);
+                html = html.replace(citation, `<a href="#tree-${id}" class="citation" id="cite-${id}">${citation}</a>`);
+            });
+
+            html += `
+                <h3>Iteration Summary</h3>
+                <ul>
+                    <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
+                    <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
+                    <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
+                </ul>
+            `;
+
+            return html;
+        }
+
+        function updateEvidenceFromTree(node) {
+            if (node.id.startsWith('E')) {
+                allEvidence[node.id] = {
+                    text: node.text,
+                    url: node.url
+                };
+            }
+            node.children.forEach(updateEvidenceFromTree);
+        }
+
+        function updateCitationTrees(fullCitationTree) {
+            const citationTreesContainer = document.getElementById('citationTrees');
+            citationTreesContainer.innerHTML = '';
+
+            Object.entries(fullCitationTree).forEach(([stmtId, tree]) => {
+                const treeHtml = renderCitationTree(tree);
+                citationTreesContainer.innerHTML += `
+                    <div class="citation-tree" id="tree-${stmtId}">
+                        <h3>Citation Tree for Statement ${stmtId}</h3>
+                        <ul>${treeHtml}</ul>
+                        <a href="#cite-${stmtId}" class="back-to-top">↑ Back to citation</a>
+                    </div>
+                `;
+            });
+        }
+
+        function renderCitationTree(node) {
+            let html = `<li id="tree-${node.id}"><strong>${node.id}:</strong> ${node.text}`;
+            if (node.id.startsWith('E') && node.url) {
+                html += `<br><a href="${node.url}" target="_blank">${node.url}</a>`;
+            }
+            if (node.children && node.children.length > 0) {
+                html += '<ul>';
+                node.children.forEach(child => {
+                    html += renderCitationTree(child);
+                });
+                html += '</ul>';
+            }
+            html += '</li>';
+            return html;
+        }
+
+        submitQuestion.addEventListener('click', () => {
+            const question = questionInput.value.trim();
+            if (question && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    question: question,
+                    iterations: 1,
+                    num_queries: 1
+                }));
+                questionScreen.style.display = 'none';
+                reportScreen.style.display = 'flex';
+                reportContent.innerHTML = `<h2 class="report-title">Report for: "${question}"</h2>`;
+                chatMessages.innerHTML = '';
+            }
+        });
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const feedback = chatInput.value.trim();
+                if (feedback) {
+                    appendToChat('User Feedback', `<p>${feedback}</p>`);
+                    chatInput.value = '';
+                }
+            }
+        });
+
+        backButton.addEventListener('click', () => {
+            reportScreen.style.display = 'none';
+            questionScreen.style.display = 'flex';
+            questionInput.value = '';
+        });
+
+        function appendToChat(title, content) {
+            const section = document.createElement('div');
+            section.innerHTML = `<h3>${title}</h3>${content}`;
+            chatMessages.appendChild(section);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        connectWebSocket();
+    </script>
+</body>
+</html>

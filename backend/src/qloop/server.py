@@ -14,6 +14,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
+import re
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -109,31 +110,64 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int):
     previous_queries_and_statements = ""
-    current_best_answer = ""
     orchestrator.main_question = main_question
+    all_statements = {}
+    all_evidence = {}
+    all_evidence_ids = set()
+    used_evidence_ids = set()
+    total_statements = 0
 
     for iteration in range(iterations):
         # Generate queries
         next_queries = await orchestrator.generate_next_queries(
-            main_question, previous_queries_and_statements, current_best_answer, num_queries, iteration
+            main_question, previous_queries_and_statements, "", num_queries, iteration
         )
-        await websocket.send_json({"type": "queries", "data": next_queries})
+        await websocket.send_json({
+            "type": "queries",
+            "data": next_queries,
+            "iteration": iteration + 1
+        })
 
-        # Prepare tasks for parallel execution
-        statement_tasks = []
-        for query_index, query in enumerate(next_queries):
-            task = asyncio.create_task(orchestrator.generate_statements(
-                main_question, query, previous_queries_and_statements, iteration, query_index
-            ))
-            statement_tasks.append((query_index, query, task))
+        new_evidence_found = 0
+        new_evidence_used = 0
+        new_statements = 0
+        iteration_evidence_ids = set()
 
-        # Wait for all tasks to complete
-        for query_index, query, task in statement_tasks:
-            statements, search_results = await task
-            await websocket.send_json({"type": "statements", "data": statements})
+        # Process queries and generate statements
+        for query_index, current_query in enumerate(next_queries, 1):
+            statements, search_results = await orchestrator.generate_statements(
+                main_question, current_query, previous_queries_and_statements, iteration, query_index
+            )
+            
+            # Process search results and statements
+            for result in search_results.get('results', []):
+                evidence_id = result.get('id')
+                if evidence_id and evidence_id not in all_evidence_ids:
+                    new_evidence_found += 1
+                    all_evidence_ids.add(evidence_id)
 
-            # Update previous_queries_and_statements
-            previous_queries_and_statements += f"\nQuery {query_index + 1}: {query}\n"
+            for stmt in statements:
+                new_statements += 1
+                total_statements += 1
+                all_statements[stmt['id']] = stmt
+                for evidence in stmt['evidence']:
+                    if evidence.startswith('E'):
+                        if evidence not in used_evidence_ids:
+                            new_evidence_used += 1
+                            used_evidence_ids.add(evidence)
+                        iteration_evidence_ids.add(evidence)
+                        evidence_data = next((result for result in search_results.get('results', []) if result.get('id') == evidence), None)
+                        if evidence_data:
+                            all_evidence[evidence] = evidence_data
+
+            await websocket.send_json({
+                "type": "statements",
+                "data": statements,
+                "iteration": iteration + 1,
+                "query_index": query_index
+            })
+
+            previous_queries_and_statements += f"\nQuery: {current_query}\n"
             for stmt in statements:
                 previous_queries_and_statements += f"Statement {stmt['id']}: {stmt['text']}\n"
 
@@ -141,11 +175,112 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
         answer = await orchestrator.generate_answer(
             main_question, previous_queries_and_statements, iteration
         )
-        current_best_answer = answer
-        await websocket.send_json({"type": "answer", "data": answer})
 
-    # Send final result
-    await websocket.send_json({"type": "final_answer", "data": current_best_answer})
+        # Extract cited statements from the answer
+        cited_statements = set(re.findall(r'\[(S\d+)\]', answer))
+
+        # Generate full citation tree for cited statements
+        full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
+
+        # Prepare iteration summary
+        iteration_summary = {
+            "iteration": iteration + 1,
+            "new_evidence_found": new_evidence_found,
+            "new_evidence_used": new_evidence_used,
+            "new_statements": new_statements,
+            "total_evidence_found": len(all_evidence_ids),
+            "total_evidence_used": len(used_evidence_ids),
+            "total_statements": total_statements
+        }
+
+        # Send answer with full citation tree
+        await websocket.send_json({
+            "type": "answer",
+            "data": answer,
+            "iteration": iteration + 1,
+            "summary": iteration_summary,
+            "full_citation_tree": full_citation_tree
+        })
+
+def generate_citation_tree_data(all_statements, all_evidence, max_depth=5):
+    def build_tree(node_id, depth=0, visited=None):
+        if visited is None:
+            visited = set()
+        
+        if depth >= max_depth or node_id in visited:
+            return None
+        
+        visited.add(node_id)
+        
+        if node_id.startswith('S'):
+            statement = all_statements.get(node_id)
+            if isinstance(statement, dict):
+                children = [build_tree(e, depth + 1, visited.copy()) for e in statement.get('evidence', [])]
+                children = [child for child in children if child is not None]
+                return {
+                    'id': node_id,
+                    'text': statement['text'],
+                    'children': children
+                }
+        elif node_id.startswith('E'):
+            evidence = all_evidence.get(node_id, "Evidence text not found")
+            url = ""
+            if isinstance(evidence, dict):
+                url = evidence.get('meta', {}).get('url', '')
+                evidence = evidence.get('text', "Evidence text not found")
+            return {
+                'id': node_id,
+                'text': evidence,
+                'url': url,
+                'children': []
+            }
+        return None
+
+    trees = {}
+    for stmt_id in all_statements.keys():
+        tree = build_tree(stmt_id)
+        if tree:
+            trees[stmt_id] = tree
+
+    return trees
+
+def generate_full_citation_tree(all_statements, all_evidence, cited_statements, max_depth=5):
+    def build_tree(node_id, depth=0, visited=None):
+        if visited is None:
+            visited = set()
+        
+        if depth >= max_depth or node_id in visited:
+            return None
+        
+        visited.add(node_id)
+        
+        if node_id.startswith('S'):
+            statement = all_statements.get(node_id)
+            if isinstance(statement, dict):
+                children = [build_tree(e, depth + 1, visited.copy()) for e in statement.get('evidence', [])]
+                children = [child for child in children if child is not None]
+                return {
+                    'id': node_id,
+                    'text': statement['text'],
+                    'children': children
+                }
+        elif node_id.startswith('E'):
+            evidence = all_evidence.get(node_id, {})
+            return {
+                'id': node_id,
+                'text': evidence.get('text', "Evidence text not found"),
+                'url': evidence.get('meta', {}).get('url', ''),
+                'children': []
+            }
+        return None
+
+    trees = {}
+    for stmt_id in cited_statements:
+        tree = build_tree(stmt_id)
+        if tree:
+            trees[stmt_id] = tree
+
+    return trees
 
 if __name__ == "__main__":
     import uvicorn
