@@ -140,16 +140,16 @@
         }
 
         .citation-tree {
+            display: none;
             background-color: #f9f9f9;
             border: 1px solid #ddd;
             margin: 15px 0;
             padding: 20px;
             border-radius: 5px;
-            display: block;
         }
 
-        .citation-tree.hidden {
-            display: none;
+        .citation-tree:not(.hidden) {
+            display: block;
         }
 
         .citation-tree ul {
@@ -361,7 +361,10 @@
 
             // Then, process citations
             html = html.replace(/\[(S\d+|E\d+)\]/g, (match, id) => {
-                return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
+                if (allStatements[id] || allEvidence[id]) {
+                    return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
+                }
+                return match;
             });
 
             // Add summary
@@ -390,7 +393,7 @@
         function updateCitationTrees(fullCitationTree) {
             Object.entries(fullCitationTree).forEach(([stmtId, tree]) => {
                 const treeContainer = document.getElementById(`tree-${stmtId}`);
-                if (treeContainer) {
+                if (treeContainer && tree.children.length > 0) {
                     const treeHtml = renderCitationTree(tree);
                     treeContainer.innerHTML = `
                         <div class="tree-content">
@@ -411,14 +414,6 @@
                     const tree = document.getElementById(treeId);
                     
                     if (tree) {
-                        // Close all other open trees
-                        document.querySelectorAll('.citation-tree:not(.hidden)').forEach(openTree => {
-                            if (openTree.id !== treeId) {
-                                openTree.classList.add('hidden');
-                            }
-                        });
-
-                        // Toggle the clicked tree
                         tree.classList.toggle('hidden');
                     }
                 });
