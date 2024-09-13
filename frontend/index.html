@@ -157,6 +157,7 @@
             cursor: pointer;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div id="questionScreen">
@@ -270,10 +271,15 @@
         }
 
         function processAnswer(answer, summary) {
-            let html = answer.replace(/\[(S\d+|E\d+)\]/g, (match, id) => {
+            // First, convert Markdown to HTML
+            let html = marked.parse(answer);
+
+            // Then, process citations
+            html = html.replace(/\[(S\d+|E\d+)\]/g, (match, id) => {
                 return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
             });
 
+            // Add summary
             html += `
                 <h3>Iteration Summary</h3>
                 <ul>
@@ -355,7 +361,15 @@
             return html;
         }
 
-        submitQuestion.addEventListener('click', () => {
+        submitQuestion.addEventListener('click', submitQuestionHandler);
+
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                submitQuestionHandler();
+            }
+        });
+
+        function submitQuestionHandler() {
             const question = questionInput.value.trim();
             if (question && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
@@ -368,7 +382,7 @@
                 reportContent.innerHTML = `<h2 class="report-title">Report for: "${question}"</h2>`;
                 chatMessages.innerHTML = '';
             }
-        });
+        }
 
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
