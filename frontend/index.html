@@ -460,6 +460,10 @@
                 case 'answer':
                     displayAnswer(data.data, data.iteration, data.summary, data.full_citation_tree);
                     break;
+                case 'feedback_received':
+                    console.log("Feedback received from server:", data.message);
+                    appendToChat('Feedback Received', `<p>${data.message}</p>`);
+                    break;
                 default:
                     console.log('Unknown message type:', data.type);
             }
@@ -636,11 +640,22 @@
             if (e.key === 'Enter') {
                 const feedback = chatInput.value.trim();
                 if (feedback) {
-                    appendToChat('User Feedback', `<p>${feedback}</p>`);
-                    chatInput.value = '';
+                    sendFeedback(feedback);
                 }
             }
         });
+
+        function sendFeedback(feedback) {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    feedback: feedback
+                }));
+                appendToChat('User Feedback', `<p>${feedback}</p>`);
+                chatInput.value = '';
+            } else {
+                console.error('WebSocket is not open. Unable to send feedback.');
+            }
+        }
 
         newButton.addEventListener('click', () => {
             reportScreen.style.display = 'none';
