@@ -49,6 +49,11 @@ class PipelineOrchestrator:
         self.session_id = f"S{self.pipeline_start_ts}"
         self.main_question = ""
 
+    def reset_ids(self):
+        self.pipeline_start_ts = int(time.time())
+        self.trace_id = f"T{self.pipeline_start_ts}"
+        self.session_id = f"S{self.pipeline_start_ts}"
+
     def get_metadata(self, iteration=None, query_index=None):
         metadata = {
             "trace_name": self.main_question[:],
@@ -103,6 +108,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"error": "No question provided"})
                 continue
 
+            orchestrator.reset_ids()  # Reset trace and session IDs for new question
             await run_pipeline(websocket, main_question, iterations, num_queries)
 
     except WebSocketDisconnect:
