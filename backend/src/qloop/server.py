@@ -162,12 +162,17 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
         new_statements = 0
         iteration_evidence_ids = set()
 
-        # Process queries and generate statements
-        for query_index, current_query in enumerate(next_queries, 1):
+        # Process queries and generate statements in parallel
+        async def process_query(query_index, current_query):
             statements, search_results = await orchestrator.generate_statements(
                 main_question, current_query, iteration, query_index
             )
-            
+            return statements, search_results, query_index
+
+        tasks = [process_query(i+1, query) for i, query in enumerate(next_queries)]
+        results = await asyncio.gather(*tasks)
+
+        for statements, search_results, query_index in results:
             # Process search results and statements
             if isinstance(search_results, list):
                 results = search_results
@@ -203,12 +208,11 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
                 "query_index": query_index
             })
 
-            orchestrator.current_history += f"\nQuery: {current_query}\n"
+            orchestrator.current_history += f"\nQuery: {next_queries[query_index-1]}\n"
             for stmt in statements:
                 orchestrator.current_history += f"Statement {stmt['id']}: {stmt['text']}\n"
 
         # Generate answer
-        
         answer = await orchestrator.generate_answer(
             main_question, iteration
         )
