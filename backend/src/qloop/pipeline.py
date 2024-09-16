@@ -15,7 +15,7 @@ os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 
 from src.llm.completion import Completion
-from src.tools.web_search import BraveSearchClient
+from src.tools.web_search import ExaSearchClient
 from src.util.setup_logging import setup_logging
 
 logger = setup_logging(__file__)
@@ -24,7 +24,7 @@ STATEMENT_ID_DIGITS = 10
 
 class StatementGenerator:
     def __init__(self):
-        self.web_search = BraveSearchClient()
+        self.web_search = ExaSearchClient()
         self.skill = Completion(('QLoop', 'Statements'))
 
     def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict) -> Tuple[List[dict], dict]:
