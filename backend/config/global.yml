@@ -5,3 +5,5 @@ paths:
   env: config/.env
   logs: logs
   skills: skills
+models:
+  reranker: rerank-english-v3.0

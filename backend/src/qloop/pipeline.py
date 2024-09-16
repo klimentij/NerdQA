@@ -15,7 +15,7 @@ os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 
 from src.llm.completion import Completion
-from src.tools.web_search import ExaSearchClient
+from src.tools.web_search import ExaSearchClie  nt
 from src.util.setup_logging import setup_logging
 
 logger = setup_logging(__file__)
