@@ -31,8 +31,63 @@ class SearchClient(ABC):
         self.cache = LocalCache()
 
     @abstractmethod
-    def search(self, query: str) -> dict:
+    def _get_search_url(self, query: str) -> str:
         pass
+
+    @abstractmethod
+    def _get_headers(self) -> dict:
+        pass
+
+    @abstractmethod
+    def _get_payload(self, query: str) -> dict:
+        pass
+
+    def search(self, query: str) -> dict:
+        url = self._get_search_url(query)
+        headers = self._get_headers()
+        payload = self._get_payload(query)
+        
+        # Generate a cache key
+        cache_key = hashlib.md5(f"{url}{json.dumps(headers)}{json.dumps(payload)}".encode()).hexdigest()
+        
+        # Check cache
+        cached_response = self.cache.get(cache_key)
+        if cached_response is not None:
+            logger.debug("Returning cached results")
+            return cached_response
+
+        logger.debug(f"Sending request to URL: {url}")
+        logger.debug(f"Headers: {headers}")
+        logger.debug(f"Payload: {payload}")
+        
+        try:
+            if payload:
+                response = self.session.post(url, headers=headers, json=payload)
+            else:
+                response = self.session.get(url, headers=headers)
+            response.raise_for_status()
+            raw_results = response.json()
+            
+            # Debug log the unfiltered search results
+            logger.debug(f"Unfiltered search results: {json.dumps(raw_results, indent=2)}")
+            
+            filtered_results = self._filter_results(raw_results)
+            result = {"results": filtered_results}
+            
+            # Cache the result
+            self.cache.set(cache_key, result)
+            
+            return result
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                logger.warning(f"Rate limit exceeded (429 error). Retrying...")
+                raise
+            logger.error(f"HTTP error occurred: {e}")
+            logger.error(f"Response content: {e.response.content}")
+            return {"error": str(e), "response_content": e.response.content.decode()}
+        except Exception as e:
+            logger.error(f"An error occurred during web search: {e}")
+            return {"error": str(e)}
 
     @abstractmethod
     def _filter_results(self, response):
@@ -64,29 +119,18 @@ class BraveSearchClient(SearchClient):
             'text_decorations': '0'
         }
 
-    def search(self, query: str) -> dict:
+    def _get_search_url(self, query: str) -> str:
         encoded_query = urllib.parse.quote(query)
-        url = f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0"
-        
-        logger.debug(f"Sending request to URL: {url}")
-        logger.debug(f"Headers: {self.headers}")
-        
-        try:
-            response = self.session.get(url, headers=self.headers)
-            response.raise_for_status()
-            raw_results = response.json()
-            filtered_results = self._filter_results(raw_results)
-            return {"results": filtered_results}
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                logger.warning(f"Rate limit exceeded (429 error). Retrying...")
-                raise
-            logger.error(f"HTTP error occurred: {e}")
-            logger.error(f"Response content: {e.response.content}")
-            return {"error": str(e), "response_content": e.response.content.decode()}
-        except Exception as e:
-            logger.error(f"An error occurred during web search: {e}")
-            return {"error": str(e)}
+        return f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0"
+
+    def _get_headers(self) -> dict:
+        return self.headers
+
+    def _get_payload(self, query: str) -> dict:
+        return None
+
+    def search(self, query: str) -> dict:
+        return super().search(query)
 
     def _filter_results(self, response):
         results = response.get('web', {}).get('results', [])
@@ -114,7 +158,62 @@ class BraveSearchClient(SearchClient):
 
         return filtered_results
 
+class ExaSearchClient(SearchClient):
+    def __init__(self):
+        super().__init__()
+        self.base_url = "https://api.exa.ai/search"
+        self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
+        if not self.api_key:
+            raise ValueError("EXA_SEARCH_API_KEY environment variable is not set")
+        self.headers = {
+            'x-api-key': self.api_key,
+            'accept': 'application/json',
+            'content-type': 'application/json'
+        }
+
+    def _get_search_url(self, query: str) -> str:
+        return self.base_url
+
+    def _get_headers(self) -> dict:
+        return self.headers
+
+    def _get_payload(self, query: str) -> dict:
+        payload = {
+            "query": query,
+            "type": "keyword",
+            "numResults": 10,
+            "contents": {
+                "text": {
+                    "maxCharacters": 200000
+                }
+            }
+        }
+        return payload
+
+    def search(self, query: str) -> dict:
+        return super().search(query)
+
+    def _filter_results(self, response):
+        results = response.get('results', [])
+        filtered_results = []
+
+        for result in results:
+            meta = {
+                'title': result.get('title', ''),
+                'url': result.get('url', ''),
+                'author': result.get('author', ''),
+                'published_date': result.get('publishedDate', '')
+            }
+
+            main_text = result.get('text', '')
+
+            filtered_results.append(self._format_text_as_json(main_text, meta=meta))
+
+        return filtered_results
+
 # Example usage
-# brave_search = BraveSearchClient()
-# results = brave_search.search("Can the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approache`?")
-# logger.info(f"Search results: \n\n{json.dumps(results, indent=2, sort_keys=False)}")
+# web_search = BraveSearchClient()
+# web_search = ExaSearchClient()
+# results = web_search.search("Can  the curse of dimensionality be overcome entirely, or is it an inherent challenge that must be managed when working with high-dimensional data? What are the trade-offs and limitations of various approache`?")
+# top_3_results = {"results": results["results"][:3]}  # Get only the top 3 results
+# logger.info(f"Top 3 search results: \n\n{json.dumps(top_3_results, indent=2, sort_keys=False)}")
