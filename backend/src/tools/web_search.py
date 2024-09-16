@@ -7,6 +7,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import hashlib
 import urllib.parse
+from abc import ABC, abstractmethod
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -17,8 +18,37 @@ from src.db.local_cache import LocalCache
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__)
 
-class BraveSearchClient:
+class SearchClient(ABC):
     def __init__(self):
+        self.session = requests.Session()
+        retries = Retry(
+            total=10,
+            backoff_factor=0.1,
+            status_forcelist=[429, 502, 503, 504],
+            respect_retry_after_header=True
+        )
+        self.session.mount('https://', HTTPAdapter(max_retries=retries))
+        self.cache = LocalCache()
+
+    @abstractmethod
+    def search(self, query: str) -> dict:
+        pass
+
+    @abstractmethod
+    def _filter_results(self, response):
+        pass
+
+    def _format_text_as_json(self, text, meta=None):
+        text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
+        unique_id = f"E{text_hash % 10**10:010d}"
+        
+        cleaned_meta = {k: v for k, v in (meta or {}).items() if v}
+        
+        return {"id": unique_id, "meta": cleaned_meta, "text": text}
+
+class BraveSearchClient(SearchClient):
+    def __init__(self):
+        super().__init__()
         self.base_url = "https://api.search.brave.com/res/v1/web/search"
         self.api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
         if not self.api_key:
@@ -33,15 +63,6 @@ class BraveSearchClient:
             'extra_snippets': '1',
             'text_decorations': '0'
         }
-        self.session = requests.Session()
-        retries = Retry(
-            total=10,
-            backoff_factor=0.1,
-            status_forcelist=[429, 502, 503, 504],
-            respect_retry_after_header=True
-        )
-        self.session.mount('https://', HTTPAdapter(max_retries=retries))
-        self.cache = LocalCache()
 
     def search(self, query: str) -> dict:
         encoded_query = urllib.parse.quote(query)
@@ -68,15 +89,6 @@ class BraveSearchClient:
             return {"error": str(e)}
 
     def _filter_results(self, response):
-        """
-        Filter the search results to include only specified keys and format as a single-level list.
-
-        Parameters:
-            response (dict): The raw search results.
-
-        Returns:
-            list: A list of dictionaries, each containing 'id', 'text', and 'meta' keys.
-        """
         results = response.get('web', {}).get('results', [])
         filtered_results = []
 
@@ -87,15 +99,12 @@ class BraveSearchClient:
                 'page_age': result.get('page_age', '')
             }
 
-            # Create the main text from description and extra_snippets
             main_text = result.get('description', '')
             if 'extra_snippets' in result:
                 main_text += ' ' + ' '.join(result['extra_snippets'])
 
-            # Add the main result
             filtered_results.append(self._format_text_as_json(main_text, meta=meta))
 
-            # Add individual entries for description and extra_snippets
             if 'description' in result:
                 filtered_results.append(self._format_text_as_json(result['description'], meta=meta))
             
@@ -104,26 +113,6 @@ class BraveSearchClient:
                     filtered_results.append(self._format_text_as_json(snippet, meta=meta))
 
         return filtered_results
-
-    def _format_text_as_json(self, text, meta=None):
-        """
-        Format text as a JSON object with 'id', 'meta', and 'text' keys.
-        Drop empty/none fields from meta.
-
-        Parameters:
-            text (str): The text to format.
-            meta (dict): Metadata for the text.
-
-        Returns:
-            dict: A JSON object with 'id', 'meta', and 'text' keys.
-        """
-        text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
-        unique_id = f"E{text_hash % 10**10:010d}"
-        
-        # Drop empty/none fields from meta
-        cleaned_meta = {k: v for k, v in (meta or {}).items() if v}
-        
-        return {"id": unique_id, "meta": cleaned_meta, "text": text}
 
 # Example usage
 # brave_search = BraveSearchClient()
