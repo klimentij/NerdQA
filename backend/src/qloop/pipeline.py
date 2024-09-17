@@ -15,7 +15,7 @@ os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 
 from src.llm.completion import Completion
-from src.tools.web_search import ExaSearchClie  nt
+from src.tools.web_search import ExaSearchClient
 from src.util.setup_logging import setup_logging
 
 logger = setup_logging(__file__)
@@ -30,7 +30,7 @@ class StatementGenerator:
     def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict) -> Tuple[List[dict], dict]:
         logger.info(f"Generating statements for query: {current_query}")
         
-        search_results = self.web_search.search(current_query)
+        search_results = self.web_search.search(current_query, main_question)
         filtered_results = search_results.get('results', [])
 
         result = self.skill.complete(

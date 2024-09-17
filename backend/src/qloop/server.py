@@ -153,7 +153,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
         )
         await websocket.send_json({
             "type": "queries",
-            "data": next_queries,
+            "data": next_queries[:num_queries],  # Limit to requested number of queries
             "iteration": iteration + 1
         })
 
@@ -169,7 +169,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             )
             return statements, search_results, query_index
 
-        tasks = [process_query(i+1, query) for i, query in enumerate(next_queries)]
+        tasks = [process_query(i+1, query) for i, query in enumerate(next_queries[:num_queries])]  # Limit to requested number of queries
         results = await asyncio.gather(*tasks)
 
         for statements, search_results, query_index in results:
