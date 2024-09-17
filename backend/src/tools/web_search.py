@@ -22,7 +22,7 @@ from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__, log_level="DEBUG")
 
 class SearchClient(ABC):
-    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000):
+    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 10):
         self.session = requests.Session()
         retries = Retry(
             total=10,
@@ -43,6 +43,7 @@ class SearchClient(ABC):
         self.reranker_model = cfg['models']['reranker']
         self.rerank = rerank
         self.max_docs_to_rerank = max_docs_to_rerank
+        self.num_results = num_results
 
     @abstractmethod
     def _get_search_url(self, query: str) -> str:
@@ -247,7 +248,7 @@ class BraveSearchClient(SearchClient):
 
     def _get_search_url(self, query: str) -> str:
         encoded_query = urllib.parse.quote(query)
-        return f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0"
+        return f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0&count={self.num_results}"
 
     def _get_headers(self) -> dict:
         return self.headers
@@ -312,7 +313,7 @@ class ExaSearchClient(SearchClient):
         payload = {
             "query": query,
             "type": "keyword",
-            "numResults": 10,
+            "numResults": self.num_results,
             "contents": {
                 "text": {
                     "maxCharacters": 200000
