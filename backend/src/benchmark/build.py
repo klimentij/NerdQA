@@ -4,7 +4,8 @@ import requests
 import io
 import time
 from PyPDF2 import PdfReader
-from typing import Dict, Any
+from typing import Dict, Any, List
+from pydantic import BaseModel, Field
 
 # Set up paths
 os.chdir(__file__.split('src/')[0])
@@ -14,6 +15,26 @@ from src.llm.completion import Completion
 from src.util.setup_logging import setup_logging
 
 logger = setup_logging(__file__)
+
+# Pydantic models for quote generation output
+class QuoteGenerationOutput(BaseModel):
+    reflection: str
+    quotes: List[str]
+    references: List[str]
+
+# Pydantic model for research question output
+class ResearchQuestionOutput(BaseModel):
+    reflection: str
+    question: str
+
+def create_metadata(trace_name: str) -> Dict[str, str]:
+    pipeline_start_ts = int(time.time())
+    return {
+        "trace_name": trace_name,
+        "trace_id": f"T{pipeline_start_ts}",
+        "trace_user_id": "Benchmark",
+        "session_id": f"S{pipeline_start_ts}"
+    }
 
 def download_pdf(url: str) -> bytes:
     logger.info(f"Downloading PDF from {url}")
@@ -30,27 +51,47 @@ def pdf_to_text(pdf_content: bytes) -> str:
         text += page.extract_text()
     return text
 
-def generate_quotes(paper_text: str, pdf_url: str) -> Dict[str, Any]:
+def generate_quotes(paper_text: str, pdf_url: str) -> QuoteGenerationOutput:
     logger.info("Generating quotes using the Quotes skill")
     skill = Completion(('BenchGen', 'Quotes'))
     
-    # Generate metadata similar to pipeline.py
-    pipeline_start_ts = int(time.time())
-    trace_id = f"T{pipeline_start_ts}"
-    session_id = f"S{pipeline_start_ts}"
-    
-    metadata = {
-        "trace_name": f"Generate quotes for {pdf_url}",
-        "trace_id": trace_id,
-        "trace_user_id": "Benchmark",
-        "session_id": session_id
-    }
+    metadata = create_metadata(f"Generate quotes for {pdf_url}")
     
     result = skill.complete(
         prompt_inputs={"PAPER": paper_text},
         completion_kwargs={"metadata": metadata}
     )
-    return result.content
+    
+    # Parse the result.content string into a dictionary
+    import json
+    try:
+        content_dict = json.loads(result.content)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse result content: {result.content}")
+        raise ValueError("Invalid response format from Quotes skill")
+    
+    return QuoteGenerationOutput(**content_dict)
+
+def generate_research_question(quotes: List[str]) -> ResearchQuestionOutput:
+    logger.info("Generating research question using the Question skill")
+    skill = Completion(('BenchGen', 'Question'))
+    
+    metadata = create_metadata("Generate research question")
+    
+    result = skill.complete(
+        prompt_inputs={"QUOTES": "\n".join(quotes)},
+        completion_kwargs={"metadata": metadata}
+    )
+    
+    # Parse the result.content string into a dictionary
+    import json
+    try:
+        content_dict = json.loads(result.content)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse result content: {result.content}")
+        raise ValueError("Invalid response format from Question skill")
+    
+    return ResearchQuestionOutput(**content_dict)
 
 def main():
     # 1. Download the PDF
@@ -65,7 +106,14 @@ def main():
 
     # 4. Log the resulting quotes
     logger.info("Generated quotes:")
-    logger.info(quotes_result)
+    logger.info(quotes_result.quotes)
+
+    # 5. Generate research question using the Question skill
+    question_result = generate_research_question(quotes_result.quotes)
+
+    # 6. Log the generated question
+    logger.info("Generated research question:")
+    logger.info(question_result.question)
 
 if __name__ == "__main__":
     main()
