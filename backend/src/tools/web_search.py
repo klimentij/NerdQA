@@ -248,7 +248,7 @@ class BraveSearchClient(SearchClient):
 
     def _get_search_url(self, query: str) -> str:
         encoded_query = urllib.parse.quote(query)
-        return f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0&count={self.num_results}"
+        return f"{self.base_url}?q={encoded_query}&result_filter=web&extra_snippets=1&text_decorations=0" # &count={self.num_results}"
 
     def _get_headers(self) -> dict:
         return self.headers
@@ -311,7 +311,7 @@ class ExaSearchClient(SearchClient):
 
     def _get_payload(self, query: str) -> dict:
         payload = {
-            "query": query,
+            "query": query[:20000], # ExaSearch has some character limit
             "type": "keyword",
             "numResults": self.num_results,
             "contents": {
@@ -345,9 +345,10 @@ class ExaSearchClient(SearchClient):
 
 #%%
 # Example usage
-# web_search = BraveSearchClient()
+web_search = BraveSearchClient()
 # web_search = BraveSearchClient(max_document_size_tokens=2000, chunk_size=20, chunk_overlap=5)
-# results = web_search.search("What   percentage of colorectal cancer-associated fibroblasts typically survive at 2 weeks if cultured with the platinum-based chemotherapy oxaliplatin?", main_question="hey yo?")
+results = web_search.search("""reated with 2 and 120 h later, expression of the SASP factors CCL2, CCL8, CXCL1PCR. In HCT116p53+/+, SW48 and SW48 cells a weak induction of IL8 and CCL2 (2-4-fold) was observed after exposure toiplatin. A weak induction of CCL2 in LoVo cells was observed at 120 h (3-fold), whereas a strong induction of IL8 (8-fold) was observed both at 96 and 120 h. Furthermore, LoVo cells also exhibited an upregulation of CCL8 and IL6 (4-8 fold); induction of IL""", 
+                            main_question="hey yo?")
 # top_3_results = {"results": results["results"][:3]}  # Get only the top 3 results
 # logger.info(f"Top 3 search results: \n\n{json.dumps(top_3_results, indent=2, sort_keys=False)}")
 

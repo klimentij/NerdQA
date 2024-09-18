@@ -147,10 +147,15 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
     total_statements = 0
 
     for iteration in range(iterations):
-        # Generate queries
-        next_queries = await orchestrator.generate_next_queries(
-            main_question, "", num_queries, iteration
-        )
+        if iteration == 0:
+            # Use the main question as the first query
+            next_queries = [main_question]
+        else:
+            # Generate queries for subsequent iterations
+            next_queries = await orchestrator.generate_next_queries(
+                main_question, "", num_queries, iteration
+            )
+
         await websocket.send_json({
             "type": "queries",
             "data": next_queries[:num_queries],  # Limit to requested number of queries
