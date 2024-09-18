@@ -27,13 +27,12 @@ class ResearchQuestionOutput(BaseModel):
     reflection: str
     question: str
 
-def create_metadata(trace_name: str) -> Dict[str, str]:
-    pipeline_start_ts = int(time.time())
+def create_metadata(trace_name: str, trace_id: str, session_id: str) -> Dict[str, str]:
     return {
         "trace_name": trace_name,
-        "trace_id": f"T{pipeline_start_ts}",
+        "trace_id": trace_id,
         "trace_user_id": "Benchmark",
-        "session_id": f"S{pipeline_start_ts}"
+        "session_id": session_id
     }
 
 def download_pdf(url: str) -> bytes:
@@ -51,11 +50,9 @@ def pdf_to_text(pdf_content: bytes) -> str:
         text += page.extract_text()
     return text
 
-def generate_quotes(paper_text: str, pdf_url: str) -> QuoteGenerationOutput:
+def generate_quotes(paper_text: str, pdf_url: str, metadata: Dict[str, str]) -> QuoteGenerationOutput:
     logger.info("Generating quotes using the Quotes skill")
     skill = Completion(('BenchGen', 'Quotes'))
-    
-    metadata = create_metadata(f"Generate quotes for {pdf_url}")
     
     result = skill.complete(
         prompt_inputs={"PAPER": paper_text},
@@ -72,11 +69,9 @@ def generate_quotes(paper_text: str, pdf_url: str) -> QuoteGenerationOutput:
     
     return QuoteGenerationOutput(**content_dict)
 
-def generate_research_question(quotes: List[str]) -> ResearchQuestionOutput:
+def generate_research_question(quotes: List[str], metadata: Dict[str, str]) -> ResearchQuestionOutput:
     logger.info("Generating research question using the Question skill")
     skill = Completion(('BenchGen', 'Question'))
-    
-    metadata = create_metadata("Generate research question")
     
     result = skill.complete(
         prompt_inputs={"QUOTES": "\n".join(quotes)},
@@ -95,21 +90,28 @@ def generate_research_question(quotes: List[str]) -> ResearchQuestionOutput:
 
 def main():
     # 1. Download the PDF
-    pdf_url = "https://arxiv.org/pdf/2212.13138"
+    pdf_url = "https://arxiv.org/pdf/2401.01335"
     pdf_content = download_pdf(pdf_url)
+
+    # Create common metadata for the entire pipeline
+    pipeline_start_ts = int(time.time())
+    trace_name = f"Build from {pdf_url}"
+    trace_id = f"T{pipeline_start_ts}"
+    session_id = f"S{pipeline_start_ts}"
 
     # 2. Convert PDF to text
     paper_text = pdf_to_text(pdf_content)
 
     # 3. Generate quotes using the Quotes skill
-    quotes_result = generate_quotes(paper_text, pdf_url)
+    metadata = create_metadata(trace_name, trace_id, session_id)
+    quotes_result = generate_quotes(paper_text, pdf_url, metadata)
 
     # 4. Log the resulting quotes
     logger.info("Generated quotes:")
     logger.info(quotes_result.quotes)
 
     # 5. Generate research question using the Question skill
-    question_result = generate_research_question(quotes_result.quotes)
+    question_result = generate_research_question(quotes_result.quotes, metadata)
 
     # 6. Log the generated question
     logger.info("Generated research question:")
