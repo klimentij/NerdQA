@@ -90,7 +90,7 @@ def generate_research_question(quotes: List[str], metadata: Dict[str, str]) -> R
 
 def main():
     # 1. Download the PDF
-    pdf_url = "https://arxiv.org/pdf/2401.01335"
+    pdf_url = "https://arxiv.org/pdf/2202.03629"
     pdf_content = download_pdf(pdf_url)
 
     # Create common metadata for the entire pipeline
