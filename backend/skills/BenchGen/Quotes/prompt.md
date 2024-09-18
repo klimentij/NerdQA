@@ -14,7 +14,7 @@ You are an expert research analyst specializing in identifying novel syntheses a
 ## Instructions
 
 1. **Thoroughly read and analyze the paper:**
-   - Focus on the introduction, literature review, and discussion sections, especially before any experimental results are presented.
+   - Focus on the introduction, related work, and background sections, especially before any experimental results are presented.
    - Pay special attention to paragraphs that cite multiple sources.
 
 2. **Identify potential synthesis candidates:**
@@ -44,6 +44,7 @@ You are an expert research analyst specializing in identifying novel syntheses a
 8. **Extract the quote:**
    - Copy the quote exactly, maintaining its original structure and content.
    - Preserve the original citations exactly as they appear in the paper, including numeric citation formats like [1], [2], etc.
+   - Trim any parts of the quote that directly relate to the current study, ensuring the quote can be read as a standalone synthesis.
    - It is crucial to copy the quote character-for-character, including any broken words, mistakes, or unusual formatting. Even a single character difference will cause the entire job to fail.
 
 9. **Create a references list:**
@@ -65,7 +66,7 @@ You are an expert research analyst specializing in identifying novel syntheses a
 2. The exact quote(s) demonstrating novel synthesis, with original citation formatting preserved, presented as a JSON array. If no suitable quotes are found, output an empty array. Remember, quotes must be copied character-for-character exactly as they appear in the paper.
 3. A references array with shortened citations corresponding to the citations in the quotes. If no quotes are found, this should also be an empty array.
 
-## Example 1 (With Quotes)
+## Example 1
 
 ### Input Paper:
 "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (trimmed for brevity)
@@ -87,20 +88,11 @@ The paper synthesizes insights from existing literature to propose a novel frame
     "Wei (2022) Chain-of-thought prompting elicits reasoning in large language models",
     "Ouyang (2022) Training language models to follow instructions with human feedback",
     "Touvron (2023) LLaMA: Open and Efficient Foundation Language Models",
-    "Anthropic (2022) Constitutional AI: Harmlessness from AI Feedback",
-    "Google (2022) LaMDA: Language Models for Dialog Applications",
-    "OpenAI (2022) ChatGPT: Optimizing Language Models for Dialogue",
-    "DeepMind (2023) Sparrow: An AI agent to make language models safer and more ethical",
-    "Hendrycks (2021) Measuring massive multitask language understanding",
-    "Liang (2022) Holistic Evaluation of Language Models",
-    "Brown (2020) Language models are few-shot learners",
-    "Ouyang (2022) Training language models to follow instructions with human feedback",
-    "OpenAI (2023) GPT-4 Technical Report",
-    "Chen (2021) Evaluating large language models trained on code"
+    "... 10 references trimmed for brevity"
 ]
 
 
-## Example 2 (With Quotes)
+## Example 2
 
 ### Input Paper:
 "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models" (trimmed for brevity)
@@ -122,15 +114,11 @@ In the initial sections of the paper, the authors lay the groundwork for their a
     "Ling (2017) Program induction by rationale generation: Learning to solve and explain algebraic word problems",
     "Cobbe (2021) Training verifiers to solve math word problems",
     "Roy (2015) Solving general arithmetic word problems",
-    "Chiang (2019) Semantically-aligned equation generation for solving and reasoning math word problems",
-    "Amini (2019) MathQA: Towards interpretable math word problem solving with operation-based formalisms",
-    "Chen (2020) Neural symbolic reader: Scalable integration of distributed and symbolic representations for reading comprehension",
-    "Brown (2020) Language models are few-shot learners",
-    "Rae (2021) Scaling language models: Methods, analysis & insights from training Gopher"
+    "... 5 references trimmed for brevity"
 ]
 
 
-## Example 3 (No Suitable Quotes)
+## Example 3
 
 ### Input Paper:
 "Experimental Analysis of Quantum Circuit Optimization Techniques" (trimmed for brevity)
@@ -144,7 +132,7 @@ After thoroughly analyzing the paper, I couldn't identify any quotes that demons
 ### References:
 []
 
-## Example 4 (With One Quote)
+## Example 4
 
 ### Input Paper:
 "LEAST-TO-MOST PROMPTING ENABLES COMPLEX REASONING IN LARGE LANGUAGE MODELS" (trimmed for brevity)
@@ -164,9 +152,49 @@ The paper synthesizes insights from various existing techniques to propose a nov
     "1. Wei (2022) Chain-of-thought prompting elicits reasoning in large language models",
     "2. Chowdhery (2022) PaLM: Scaling language modeling with pathways",
     "3. Ling (2017) Program induction by rationale generation: Learning to solve and explain algebraic word problems",
-    "4. Cobbe (2021) Training verifiers to solve math word problems",
-    "5. Brown (2020) Language models are few-shot learners",
-    "6. Wang (2022) Self-consistency improves chain of thought reasoning in language models",
-    "7. Lake (2018) Generalization without systematicity: On the compositional skills of sequence-to-sequence recurrent networks",
-    "8. Keysers (2020) Measuring compositional generalization: A comprehensive method on realistic data"
+    "... 5 references trimmed for brevity"
+]
+
+## Example 5
+
+### Input Paper:
+"Self-Play Fine-Tuning Converts Weak Language Models to Strong Language Models" (trimmed for brevity)
+
+### Reflection:
+The paper synthesizes insights from various existing techniques to propose a novel fine-tuning method called Self-Play Fine-Tuning (SPIN). The authors draw on previous work in self-play mechanisms and the use of synthetic data for language model fine-tuning to argue that a language model can iteratively improve itself without additional human-annotated data. This synthesis is particularly evident in the introduction and related work sections, where the authors compare and contrast different approaches and their limitations.
+
+### Quotes demonstrating novel synthesis:
+
+[
+    "Self-Play. Self-play (Samuel, 1959; Tesauro et al., 1995), where the algorithm learns by playing against itself, has gained notable attention due to its effectiveness in multi-agent reinforcement learning (MARL). This method involves agents engaging in interactions with copies of themselves, enabling an increasing level of challenge and complexity within the learning environment. A fundamental work in the field of self-play is AlphaGo Zero (Silver et al., 2017b), which demonstrated exceptional performance against human players using a self-play learning scheme. Subsequent research has expanded upon the concept of self-play, exploring various adaptations and implementations (Anthony et al., 2017; Lanctot et al., 2017; Bansal et al., 2018; Hernandez-Leal et al., 2018; Muller et al., 2019; Vinyals et al., 2019).",
+    "Synthetic Data for LLMs. In the context of supervised fine-tuning (SFT) of LLMs, human-crafted data has proven to be a remarkably effective source that enhances the performance of LLMs on tasks such as code generation (Roziere et al., 2023; Yang et al., 2023) and mathematical reasoning (Yuan et al., 2023; Luo et al., 2023). While human data typically exhibits high quality, acquiring sufficient amount of such data poses a challenge in cost. In light of this consideration, the use of synthetic data has become increasingly popular and considered as a proxy for human data. This approach primarily leverages advanced LLMs such as the GPT series (Radford et al., 2019; Brown et al., 2020; OpenAI, 2023) as the guidance to generate high-quality data (Josifoski et al., 2023; Taori et al., 2023; Chiang et al., 2023; Li et al., 2023). Recent research has also highlighted the rephrasing capability of LLMs in prompting for better LLM response (Deng et al., 2023; Prasad et al., 2023) as well as augmenting synthetic data for more effective SFT (Yu et al., 2023; Liu et al., 2023)."
+]
+
+### References:
+
+[
+    "Samuel (1959) Some studies in machine learning using the game of checkers",
+    "Tesauro (1995) Temporal difference learning and TD-Gammon",
+    "Silver (2017b) Mastering the game of go without human knowledge",
+    "Anthony (2017) Thinking fast and slow with deep learning and tree search",
+    "Lanctot (2017) A unified game-theoretic approach to multiagent reinforcement learning",
+    "Bansal (2018) Emergent complexity via multi-agent competition",
+    "Hernandez-Leal (2018) Is multiagent deep reinforcement learning the answer or the question? a brief survey",
+    "Muller (2019) A generalized training approach for multiagent learning",
+    "Vinyals (2019) AlphaStar: Mastering the Real-Time Strategy Game StarCraft II",
+    "Roziere (2023) Code llama: Open foundation models for code",
+    "Yang (2023) Decoding data quality via synthetic corruptions: Embedding-guided pruning of code data",
+    "Yuan (2023) Scaling relationship on learning mathematical reasoning with large language models",
+    "Luo (2023) Wizard-math: Empowering mathematical reasoning for large language models via reinforced evol-instruct",
+    "Radford (2019) Language models are unsupervised multitask learners",
+    "Brown (2020) Language models are few-shot learners",
+    "OpenAI (2023) GPT-4 Technical Report",
+    "Josifoski (2023) Exploiting asymmetry for synthetic training data generation: Synthie and the case of information extraction",
+    "Taori (2023) Stanford alpaca: An instruction-following llama model",
+    "Chiang (2023) Vicuna: An open-source chatbot impressing gpt-4 with 90%* chatgpt quality",
+    "Li (2023) Textbooks are all you need ii: phi-1.5 technical report",
+    "Deng (2023) Rephrase and respond: Let large language models ask better questions for themselves",
+    "Prasad (2023) Rephrase, augment, reason: Visual grounding of questions for vision-language models",
+    "Yu (2023) Metamath: Bootstrap your own mathematical questions for large language models",
+    "Liu (2023) Tinygsm: achieving> 80% on gsm8k with small language models"
 ]
