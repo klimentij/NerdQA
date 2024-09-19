@@ -23,6 +23,11 @@ class ReportGenerationOutput(BaseModel):
     reflection: str
     report: str  # Updated field name to match the response format
 
+# Pydantic model for question generation output
+class QuestionGenerationOutput(BaseModel):
+    reflection: str
+    question: str
+
 def create_metadata(trace_name: str, trace_id: str, session_id: str) -> Dict[str, str]:
     return {
         "trace_name": trace_name,
@@ -71,9 +76,28 @@ def generate_report(formatted_snippets: str, metadata: Dict[str, str]) -> Report
     
     return ReportGenerationOutput(**content_dict)
 
+def generate_question(report: str, metadata: Dict[str, str]) -> QuestionGenerationOutput:
+    logger.info("Generating question using the Question skill")
+    skill = Completion(('BenchPaperCompress', 'Question'))
+    
+    result = skill.complete(
+        prompt_inputs={"REPORT": report},
+        completion_kwargs={"metadata": metadata}
+    )
+    
+    # Parse the result.content string into a dictionary
+    try:
+        content_dict = json.loads(result.content)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse result content: {result.content}")
+        raise ValueError("Invalid response format from Question skill")
+    
+    return QuestionGenerationOutput(**content_dict)
+
 def main():
     # 1. Download the PDF
-    pdf_url = "https://arxiv.org/pdf/2201.11903"
+    # pdf_url = "https://arxiv.org/pdf/2201.11903"
+    pdf_url = "https://arxiv.org/pdf/2408.06292"
     pdf_content = download_pdf(pdf_url)
 
     # Create common metadata for the entire pipeline
@@ -98,6 +122,13 @@ def main():
     # 5. Log the resulting report
     logger.info("Generated report:")
     logger.info(report_result.report)
+
+    # 6. Generate question based on the report
+    question_result = generate_question(report_result.report, metadata)
+
+    # 7. Log the resulting question
+    logger.info("Generated question:")
+    logger.info(question_result.question)
 
 if __name__ == "__main__":
     main()

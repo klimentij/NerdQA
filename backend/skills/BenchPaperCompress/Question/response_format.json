@@ -1,0 +1,22 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "question_response",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A one-page reflection on the given report, including main topics and themes, logical progression of ideas, how it leads to the final hypothesis, key elements the question must address, and potential approaches to formulating the question."
+        },
+        "question": {
+          "type": "string",
+          "description": "A clear, concise, and thought-provoking question that would naturally lead to the given report as a response. The question should be broad enough to cover all major points in the report, guide the respondent towards synthesizing existing literature and formulating a hypothesis, and sound natural and realistic."
+        }
+      },
+      "required": ["reflection", "question"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

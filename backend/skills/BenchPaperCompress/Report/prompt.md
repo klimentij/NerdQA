@@ -43,7 +43,7 @@ This task involves compressing a scientific paper into a concise report that foc
 ### Part 2: Report (2-3 pages)
 - Write a final report that is easy to read. Use headings to organize the content into sections. Use all the power of markdown (bold, italic, bullet points, etc.) to make the report more readable. It must be concise and easy to read.
 - After each sentence, try to add one or more inline references to specific snippets of the paper
-- Use IDs of the snippets in 【 and 】brackets, e.g., "..have demonstrated remarkable capabilities【s123】【s456】.."
+- Use IDs of the snippets in 【 and 】brackets, e.g., "..have demonstrated remarkable capabilities【s123】【s456】.." or "..previous studies have shown【s123】【s456】【s789】.." etc.
 - Ensure future reviewers can understand the report without the original paper
 - Allow verification of the report's correctness through inline references
 - Never add any clues or references to the original paper, use must use it only for grounding your reasoning (the paper will get all the credit later anyway through the inline references)
