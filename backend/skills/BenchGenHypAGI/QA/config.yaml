@@ -10,4 +10,4 @@ completion_kwargs:
 trims:
   - name: 'PAPER'
     trim_type: 'MIDDLE'
-    max_length: 100000
+    max_length: 60000
