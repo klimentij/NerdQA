@@ -97,7 +97,8 @@ def generate_question(report: str, metadata: Dict[str, str]) -> QuestionGenerati
 def main():
     # 1. Download the PDF
     # pdf_url = "https://arxiv.org/pdf/2201.11903"
-    pdf_url = "https://arxiv.org/pdf/2408.06292"
+    # pdf_url = "https://arxiv.org/pdf/2408.06292"
+    pdf_url = "https://www.ijisrt.com/assets/upload/files/IJISRT24JUL244.pdf"
     pdf_content = download_pdf(pdf_url)
 
     # Create common metadata for the entire pipeline
