@@ -21,7 +21,7 @@ logger = setup_logging(__file__)
 # Pydantic model for report generation output
 class ReportGenerationOutput(BaseModel):
     reflection: str
-    compressed_report: str  # Updated field name to match the response format
+    report: str  # Updated field name to match the response format
 
 def create_metadata(trace_name: str, trace_id: str, session_id: str) -> Dict[str, str]:
     return {
