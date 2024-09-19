@@ -65,7 +65,7 @@ def generate_agi_level_qa(paper_text: str, metadata: Dict[str, str]) -> QAOutput
 
 def main():
     # 1. Download the PDF
-    pdf_url = "https://arxiv.org/pdf/2201.11903"
+    pdf_url = "https://arxiv.org/pdf/2203.11171"
     pdf_content = download_pdf(pdf_url)
 
     # Create common metadata for the entire pipeline
