@@ -7,11 +7,11 @@
       "properties": {
         "reflection": {
           "type": "string",
-          "description": "A one-page reflection on the paper and your plan on how to write a perfect report that would satisfy the requirements of the task I gave you by grounding on the paper"
+          "description": "A one-page reflection on the given paper, including what it's about, what it's trying to do, how you'll write a report that satisfies the task requirements, analysis of new terms or innovations to be excluded, and a high-level report structure outline."
         },
         "report": {
           "type": "string",
-          "description": "A 1-2 page report in markdown format, compressing the paper's content according to the specified instructions. Each sentence should be followed by one or more inline references to specific snippets of the paper using the provided IDs in square brackets (e.g. [s1][s2])."
+          "description": "A 2-3 page report in markdown format, compressing the paper's content according to the specified instructions. The report should be easy to read, use headings to organize content into sections, and utilize markdown features for readability. Each sentence should be followed by one or more inline references to specific snippets of the paper using IDs in 【 and 】 brackets (e.g., 【s123】【s456】)."
         }
       },
       "required": ["reflection", "report"],
