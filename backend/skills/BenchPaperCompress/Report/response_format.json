@@ -1,0 +1,22 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "paper_compression_response",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A one-page reflection on the paper and your plan on how to write a perfect report that would satisfy the requirements of the task I gave you by grounding on the paper"
+        },
+        "compressed_report": {
+          "type": "string",
+          "description": "A 1-2 page report in markdown format, compressing the paper's content according to the specified instructions. Each sentence should be followed by one or more inline references to specific snippets of the paper using the provided IDs in square brackets (e.g. [s1][s2])."
+        }
+      },
+      "required": ["reflection", "compressed_report"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

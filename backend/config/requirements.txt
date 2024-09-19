@@ -10,3 +10,4 @@ markdown
 diskcache
 tokenizers
 pypdf2
+nltk==3.9.1
