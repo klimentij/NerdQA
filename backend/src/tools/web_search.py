@@ -11,6 +11,13 @@ import urllib.parse
 from abc import ABC, abstractmethod
 from typing import List, Dict
 from tokenizers import Tokenizer
+from io import BytesIO
+from pdfminer.high_level import extract_text
+from pdfminer.layout import LAParams
+
+import concurrent.futures
+from threading import Semaphore
+from functools import partial
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -383,6 +390,7 @@ class ExaSearchClient(SearchClient):
 
         return filtered_results
 
+
 class OpenAlexSearchClient(SearchClient):
     def __init__(self, reranking_threshold: float = 0.2, **kwargs):
         super().__init__(reranking_threshold=reranking_threshold, **kwargs)
@@ -395,7 +403,7 @@ class OpenAlexSearchClient(SearchClient):
     def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
         url = f"{self.base_url}?search={encoded_query}"
-        url += f"&select=id,doi,title,relevance_score,publication_date,cited_by_count,topics,keywords,concepts,best_oa_location,abstract_inverted_index,updated_date,created_date"
+        url += f"&select=id,doi,title,relevance_score,publication_date,cited_by_count,topics,keywords,concepts,best_oa_location,abstract_inverted_index,updated_date,created_date,locations"
         
         # Use the provided sort parameter, or default to relevance_score:desc
         sort = sort or self.sort or "relevance_score:desc"
@@ -409,6 +417,168 @@ class OpenAlexSearchClient(SearchClient):
 
     def _get_payload(self, query: str, start_published_date: str = None, end_published_date: str = None, **kwargs) -> dict:
         return None  # We don't need a payload for GET requests
+
+    def _download_and_parse_pdf(self, pdf_url, locations):
+        try:
+            if pdf_url:
+                response = requests.get(pdf_url, timeout=30)
+                if response.status_code == 200:
+                    pdf_content = BytesIO(response.content)
+                    text_content = extract_text(pdf_content, laparams=LAParams())
+                    return text_content
+                else:
+                    logger.warning(f"Failed to download PDF from {pdf_url}")
+            
+            # If pdf_url is None, empty, or download failed, try arXiv
+            arxiv_pdf_url = self._get_arxiv_pdf_url(locations)
+            if arxiv_pdf_url:
+                logger.info(f"Attempting to download PDF from arXiv: {arxiv_pdf_url}")
+                response = requests.get(arxiv_pdf_url, timeout=30)
+                if response.status_code == 200:
+                    pdf_content = BytesIO(response.content)
+                    text_content = extract_text(pdf_content, laparams=LAParams())
+                    return text_content
+                else:
+                    logger.warning(f"Failed to download PDF from arXiv: {arxiv_pdf_url}")
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error downloading or parsing PDF: {e}")
+            return None
+
+    def _get_arxiv_pdf_url(self, locations):
+        for location in locations:
+            landing_page_url = location.get('landing_page_url', '')
+            if 'arxiv.org/abs/' in landing_page_url:
+                return landing_page_url.replace('/abs/', '/pdf/') + '.pdf'
+        return None
+
+    def _filter_results(self, response):
+        results = response.get('results', [])
+        filtered_results = []
+
+        for result in results:
+            try:
+                meta = {
+                    'id': self._safe_get(result, 'id', ''),
+                    'title': self._safe_get(result, 'title', ''),
+                    'publication_date': self._safe_get(result, 'publication_date', ''),
+                    'cited_by_count': self._safe_get(result, 'cited_by_count', 0),
+                    'topics': self._safe_join(result, 'topics'),
+                    'keywords': self._safe_join(result, 'keywords'),
+                    'concepts': self._safe_join(result, 'concepts'),
+                    'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
+                    'openalex_score': self._safe_get(result, 'relevance_score', 0),  # Add OpenAlex score
+                }
+
+                abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
+                locations = self._safe_get(result, 'locations', [])
+
+                filtered_results.append({"text": abstract, "meta": meta, "locations": locations})
+            except Exception as e:
+                logger.warning(f"Error processing result: {e}", exc_info=True)
+                continue
+
+        # Sort by OpenAlex score and add rank
+        filtered_results.sort(key=lambda x: x['meta']['openalex_score'], reverse=True)
+        for i, result in enumerate(filtered_results, 1):
+            result['meta']['openalex_rank'] = i
+
+        return filtered_results
+
+    def _safe_get(self, obj, key, default=None):
+        try:
+            return obj.get(key, default) if isinstance(obj, dict) else default
+        except Exception:
+            return default
+
+    def _safe_join(self, result, key):
+        try:
+            items = self._safe_get(result, key, [])
+            return ', '.join([self._safe_get(item, 'display_name', '') for item in items if isinstance(item, dict)])
+        except Exception:
+            return ''
+
+    def _reconstruct_abstract(self, abstract_inverted_index):
+        try:
+            if not isinstance(abstract_inverted_index, dict):
+                return ""
+
+            word_positions = []
+            for word, positions in abstract_inverted_index.items():
+                if isinstance(positions, list):
+                    for pos in positions:
+                        if isinstance(pos, int):
+                            word_positions.append((pos, word))
+
+            word_positions.sort()
+            return " ".join(word for _, word in word_positions)
+        except Exception as e:
+            logger.warning(f"Error reconstructing abstract: {e}", exc_info=True)
+            return ""
+
+    def _process_result(self, result: Dict) -> List[Dict]:
+        meta = result.get("meta", {})
+        text = result.get("text", "")
+        
+        tokens = self._tokenize(text)
+        num_tokens = len(tokens)
+        
+        if num_tokens <= self.max_document_size_tokens:
+            return [self._format_text_as_json(text, meta=meta, num_tokens=num_tokens)]
+        
+        return self._chunk_text(text, meta, tokens)
+
+    def _process_pdf_results(self, results):
+        processed_results = []
+        download_start_time = time.time()
+        successful_downloads = 0
+        failed_downloads = 0
+
+        max_concurrent_downloads = 5  # Adjust this value based on your needs
+        semaphore = Semaphore(max_concurrent_downloads)
+
+        def download_and_parse_pdf_with_semaphore(result):
+            with semaphore:
+                return self._download_and_parse_pdf_wrapper(result)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent_downloads) as executor:
+            future_to_result = {executor.submit(download_and_parse_pdf_with_semaphore, result): result for result in results}
+            
+            for future in concurrent.futures.as_completed(future_to_result):
+                result = future_to_result[future]
+                try:
+                    pdf_text = future.result()
+                    if pdf_text:
+                        result['text'] = pdf_text
+                        successful_downloads += 1
+                    else:
+                        failed_downloads += 1
+                except Exception as exc:
+                    logger.error(f"PDF processing generated an exception: {exc}")
+                    failed_downloads += 1
+                processed_results.append(result)
+
+        download_end_time = time.time()
+        total_download_time = download_end_time - download_start_time
+
+        logger.info(f"PDF download summary:")
+        logger.info(f"  Total download time: {total_download_time:.2f} seconds")
+        logger.info(f"  Successful downloads: {successful_downloads}")
+        logger.info(f"  Failed downloads: {failed_downloads}")
+
+        return processed_results
+
+    def _download_and_parse_pdf_wrapper(self, result):
+        pdf_url = result['meta'].get('best_oa_location_pdf_url')
+        locations = result.get('locations', [])
+        
+        if not pdf_url or not pdf_url.strip():
+            pdf_url = None
+        
+        if pdf_url or locations:
+            return self._download_and_parse_pdf(pdf_url, locations)
+        return None
 
     def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
         results = []
@@ -474,8 +644,11 @@ class OpenAlexSearchClient(SearchClient):
 
         logger.info(f"Total time for all OpenAlex retrieval requests: {total_retrieval_time:.2f} seconds")
 
+        # After filtering results but before processing and reranking
+        results = self._process_pdf_results(results[:self.initial_top_to_retrieve])
+
         processed_results = []
-        for result in results[:self.initial_top_to_retrieve]:
+        for result in results:
             processed_results.extend(self._process_result(result))
 
         reranked_results = self._rerank_results(query, processed_results, main_question)
@@ -484,81 +657,6 @@ class OpenAlexSearchClient(SearchClient):
         logger.debug(f"Final merged results after reranking: {json.dumps(reranked_results, indent=2)}")
 
         return {"results": reranked_results, "total_count": total_count}
-
-    def _filter_results(self, response):
-        results = response.get('results', [])
-        filtered_results = []
-
-        for result in results:
-            try:
-                meta = {
-                    'id': self._safe_get(result, 'id', ''),
-                    'title': self._safe_get(result, 'title', ''),
-                    'publication_date': self._safe_get(result, 'publication_date', ''),
-                    'cited_by_count': self._safe_get(result, 'cited_by_count', 0),
-                    'topics': self._safe_join(result, 'topics'),
-                    'keywords': self._safe_join(result, 'keywords'),
-                    'concepts': self._safe_join(result, 'concepts'),
-                    'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
-                    'openalex_score': self._safe_get(result, 'relevance_score', 0),  # Add OpenAlex score
-                }
-
-                abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
-
-                filtered_results.append({"text": abstract, "meta": meta})
-            except Exception as e:
-                logger.warning(f"Error processing result: {e}", exc_info=True)
-                continue
-
-        # Sort by OpenAlex score and add rank
-        filtered_results.sort(key=lambda x: x['meta']['openalex_score'], reverse=True)
-        for i, result in enumerate(filtered_results, 1):
-            result['meta']['openalex_rank'] = i
-
-        return filtered_results
-
-    def _safe_get(self, obj, key, default=None):
-        try:
-            return obj.get(key, default) if isinstance(obj, dict) else default
-        except Exception:
-            return default
-
-    def _safe_join(self, result, key):
-        try:
-            items = self._safe_get(result, key, [])
-            return ', '.join([self._safe_get(item, 'display_name', '') for item in items if isinstance(item, dict)])
-        except Exception:
-            return ''
-
-    def _reconstruct_abstract(self, abstract_inverted_index):
-        try:
-            if not isinstance(abstract_inverted_index, dict):
-                return ""
-
-            word_positions = []
-            for word, positions in abstract_inverted_index.items():
-                if isinstance(positions, list):
-                    for pos in positions:
-                        if isinstance(pos, int):
-                            word_positions.append((pos, word))
-
-            word_positions.sort()
-            return " ".join(word for _, word in word_positions)
-        except Exception as e:
-            logger.warning(f"Error reconstructing abstract: {e}", exc_info=True)
-            return ""
-
-    def _process_result(self, result: Dict) -> List[Dict]:
-        meta = result.get("meta", {})
-        text = result.get("text", "")
-        
-        tokens = self._tokenize(text)
-        num_tokens = len(tokens)
-        
-        if num_tokens <= self.max_document_size_tokens:
-            return [self._format_text_as_json(text, meta=meta, num_tokens=num_tokens)]
-        
-        return self._chunk_text(text, meta, tokens)
 
 #%%
 # Example usage
@@ -569,7 +667,10 @@ class OpenAlexSearchClient(SearchClient):
 # logger.info(f"Top 3 Brave search results: \n\n{json.dumps(top_3_brave_results, indent=2, sort_keys=False)}")
 
 # OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=True, caching=False, reranking_threshold=0.2, initial_top_to_retrieve=10)
+openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
+                                       reranking_threshold=0.2, 
+                                       initial_top_to_retrieve=10,
+                                       chunk_size=1024)
 
 openalex_results_cited = openalex_search.search(
     "How can natural language rationales improve reasoning in language models?", 
