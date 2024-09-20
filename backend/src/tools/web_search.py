@@ -390,7 +390,7 @@ class OpenAlexSearchClient(SearchClient):
         self.headers = {
             'Accept': 'application/json'
         }
-        self.per_page = 200  # OpenAlex maximum per page
+        self.per_page = min(self.initial_top_to_retrieve, 200)  # Adjust per_page based on initial_top_to_retrieve
 
     def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
@@ -460,7 +460,7 @@ class OpenAlexSearchClient(SearchClient):
                     if total_count <= self.per_page:
                         break
 
-                if len(results) >= total_count:
+                if len(results) >= min(total_count, self.initial_top_to_retrieve):
                     break
 
                 page += 1
@@ -569,10 +569,9 @@ class OpenAlexSearchClient(SearchClient):
 # logger.info(f"Top 3 Brave search results: \n\n{json.dumps(top_3_brave_results, indent=2, sort_keys=False)}")
 
 # OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=True, caching=False, reranking_threshold=0.2)
+openalex_search = OpenAlexSearchClient(rerank=True, caching=False, reranking_threshold=0.2, initial_top_to_retrieve=10)
 
 openalex_results_cited = openalex_search.search(
     "How can natural language rationales improve reasoning in language models?", 
     start_published_date="2020-01-01", end_published_date="2023-12-31")
-print(json.dumps(openalex_results_cited, indent=2, sort_keys=False))
 # %%
