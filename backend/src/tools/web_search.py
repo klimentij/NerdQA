@@ -15,9 +15,8 @@ from io import BytesIO
 from pdfminer.high_level import extract_text
 from pdfminer.layout import LAParams
 
-import concurrent.futures
-from threading import Semaphore
-from functools import partial
+import asyncio
+import aiohttp
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -29,7 +28,7 @@ from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__, log_level="DEBUG")
 
 class SearchClient(ABC):
-    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, reranking_threshold: float = 0.2):
+    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5):
         self.session = requests.Session()
         retries = Retry(
             total=10,
@@ -54,6 +53,7 @@ class SearchClient(ABC):
         self.sort = sort
         self.initial_top_to_retrieve = initial_top_to_retrieve
         self.reranking_threshold = reranking_threshold
+        self.max_concurrent_downloads = max_concurrent_downloads
 
     @abstractmethod
     def _get_search_url(self, query: str) -> str:
@@ -228,7 +228,7 @@ Current query the user needs to answer to progress towards solving the main ques
         payload = {
             "model": self.reranker_model,
             "query": rerank_query,
-            "documents": [str(result) for result in results],
+            "documents": [str(result) for result in results[:self.max_docs_to_rerank]],
             "top_n": self.max_docs_to_rerank
         }
 
@@ -399,6 +399,154 @@ class OpenAlexSearchClient(SearchClient):
             'Accept': 'application/json'
         }
         self.per_page = min(self.initial_top_to_retrieve, 200)  # Adjust per_page based on initial_top_to_retrieve
+        self.session = None
+
+    async def _create_session(self):
+        if self.session is None:
+            self.session = aiohttp.ClientSession()
+
+    async def _close_session(self):
+        if self.session:
+            await self.session.close()
+            self.session = None
+
+    async def _download_and_parse_pdf(self, pdf_url, locations):
+        if not pdf_url:
+            pdf_url = self._get_arxiv_pdf_url(locations)
+        
+        if not pdf_url:
+            return None
+
+        try:
+            async with self.session.get(pdf_url, timeout=30) as response:
+                if response.status == 200:
+                    pdf_content = await response.read()
+                    text_content = await asyncio.to_thread(
+                        extract_text, 
+                        BytesIO(pdf_content), 
+                        laparams=LAParams()
+                    )
+                    return text_content
+                else:
+                    logger.warning(f"Failed to download PDF from {pdf_url}. Status code: {response.status}")
+            return None
+        except Exception as e:
+            logger.error(f"Error downloading or parsing PDF: {e}")
+            return None
+
+    async def _process_pdf_results(self, results):
+        await self._create_session()
+        tasks = []
+        for result in results[:self.initial_top_to_retrieve]:
+            task = asyncio.create_task(self._download_and_parse_pdf_wrapper(result))
+            tasks.append(task)
+
+        processed_results = []
+        for task in asyncio.as_completed(tasks):
+            try:
+                result, pdf_text = await task
+                if pdf_text:
+                    result['text'] = pdf_text
+                processed_results.append(result)
+            except Exception as e:
+                logger.error(f"Error processing PDF: {e}")
+
+        await self._close_session()
+        return processed_results
+
+    async def _download_and_parse_pdf_wrapper(self, result):
+        pdf_url = result['meta'].get('best_oa_location_pdf_url')
+        locations = result.get('locations', [])
+        title = result['meta'].get('title', 'Unknown Title')
+        openalex_id = result['meta'].get('id', 'Unknown ID')
+        
+        logger.info(f"Attempting to download PDF for: {title} (OpenAlex ID: {openalex_id})")
+        
+        pdf_text = await self._download_and_parse_pdf(pdf_url, locations)
+        if pdf_text:
+            logger.info(f"Successfully downloaded and parsed PDF for: {title} (OpenAlex ID: {openalex_id})")
+        else:
+            logger.error(f"Failed to download or parse PDF for: {title} (OpenAlex ID: {openalex_id})")
+        
+        return result, pdf_text
+
+    async def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
+        results = []
+        total_count = 0
+        page = 1
+        total_retrieval_time = 0
+
+        while len(results) < self.initial_top_to_retrieve:
+            url = self._get_search_url(query, sort, page)
+            
+            if start_published_date and end_published_date:
+                url += f"&filter=from_publication_date:{start_published_date},to_publication_date:{end_published_date}"
+
+            logger.debug(f"Sending request to URL: {url}")
+
+            headers = self._get_headers()
+            
+            cache_key = hashlib.md5(f"{url}{json.dumps(headers)}".encode()).hexdigest()
+            
+            if self.cache:
+                cached_response = self.cache.get(cache_key)
+                if cached_response is not None:
+                    logger.debug("Returning cached results")
+                    return cached_response
+            
+            try:
+                start_time = time.time()
+                async with self.session.get(url, headers=headers) as response:
+                    response.raise_for_status()
+                    raw_results = await response.json()
+                
+                end_time = time.time()
+                search_time = end_time - start_time
+                total_retrieval_time += search_time
+                
+                logger.info(f"Retrieved {len(raw_results['results'])} raw results from search in {search_time:.2f} seconds")
+                    
+                start_time = time.time()
+                page_results = self._filter_results(raw_results)
+                results.extend(page_results)
+                
+                end_time = time.time()
+                processing_time = end_time - start_time
+                
+                logger.info(f"Processed and chunked {len(page_results)} results (turned into {len(results)} results) in {processing_time:.2f} seconds")
+                
+                if page == 1:
+                    total_count = raw_results['meta']['count']
+                    if total_count <= self.per_page:
+                        break
+
+                if len(results) >= min(total_count, self.initial_top_to_retrieve):
+                    break
+
+                page += 1
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"HTTP error occurred: {e}")
+                logger.error(f"Response content: {e.response.content}")
+                return {"error": str(e), "response_content": e.response.content.decode()}
+            except Exception as e:
+                logger.error(f"An error occurred during web search: {e}", exc_info=True)
+                return {"error": str(e)}
+
+        logger.info(f"Total time for all OpenAlex retrieval requests: {total_retrieval_time:.2f} seconds")
+
+        # After filtering results but before processing and reranking
+        results = await self._process_pdf_results(results[:self.initial_top_to_retrieve])
+
+        processed_results = []
+        for result in results:
+            processed_results.extend(self._process_result(result))
+
+        reranked_results = self._rerank_results(query, processed_results, main_question)
+
+        # Log final merged results
+        logger.debug(f"Final merged results after reranking: {json.dumps(reranked_results, indent=2)}")
+
+        return {"results": reranked_results, "total_count": total_count}
 
     def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
@@ -417,41 +565,6 @@ class OpenAlexSearchClient(SearchClient):
 
     def _get_payload(self, query: str, start_published_date: str = None, end_published_date: str = None, **kwargs) -> dict:
         return None  # We don't need a payload for GET requests
-
-    def _download_and_parse_pdf(self, pdf_url, locations):
-        try:
-            if pdf_url:
-                response = requests.get(pdf_url, timeout=30)
-                if response.status_code == 200:
-                    pdf_content = BytesIO(response.content)
-                    text_content = extract_text(pdf_content, laparams=LAParams())
-                    return text_content
-                else:
-                    logger.warning(f"Failed to download PDF from {pdf_url}")
-            
-            # If pdf_url is None, empty, or download failed, try arXiv
-            arxiv_pdf_url = self._get_arxiv_pdf_url(locations)
-            if arxiv_pdf_url:
-                logger.info(f"Attempting to download PDF from arXiv: {arxiv_pdf_url}")
-                response = requests.get(arxiv_pdf_url, timeout=30)
-                if response.status_code == 200:
-                    pdf_content = BytesIO(response.content)
-                    text_content = extract_text(pdf_content, laparams=LAParams())
-                    return text_content
-                else:
-                    logger.warning(f"Failed to download PDF from arXiv: {arxiv_pdf_url}")
-            
-            return None
-        except Exception as e:
-            logger.error(f"Error downloading or parsing PDF: {e}")
-            return None
-
-    def _get_arxiv_pdf_url(self, locations):
-        for location in locations:
-            landing_page_url = location.get('landing_page_url', '')
-            if 'arxiv.org/abs/' in landing_page_url:
-                return landing_page_url.replace('/abs/', '/pdf/') + '.pdf'
-        return None
 
     def _filter_results(self, response):
         results = response.get('results', [])
@@ -529,150 +642,27 @@ class OpenAlexSearchClient(SearchClient):
         
         return self._chunk_text(text, meta, tokens)
 
-    def _process_pdf_results(self, results):
-        processed_results = []
-        download_start_time = time.time()
-        successful_downloads = 0
-        failed_downloads = 0
-
-        max_concurrent_downloads = 5  # Adjust this value based on your needs
-        semaphore = Semaphore(max_concurrent_downloads)
-
-        def download_and_parse_pdf_with_semaphore(result):
-            with semaphore:
-                return self._download_and_parse_pdf_wrapper(result)
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent_downloads) as executor:
-            future_to_result = {executor.submit(download_and_parse_pdf_with_semaphore, result): result for result in results}
-            
-            for future in concurrent.futures.as_completed(future_to_result):
-                result = future_to_result[future]
-                try:
-                    pdf_text = future.result()
-                    if pdf_text:
-                        result['text'] = pdf_text
-                        successful_downloads += 1
-                    else:
-                        failed_downloads += 1
-                except Exception as exc:
-                    logger.error(f"PDF processing generated an exception: {exc}")
-                    failed_downloads += 1
-                processed_results.append(result)
-
-        download_end_time = time.time()
-        total_download_time = download_end_time - download_start_time
-
-        logger.info(f"PDF download summary:")
-        logger.info(f"  Total download time: {total_download_time:.2f} seconds")
-        logger.info(f"  Successful downloads: {successful_downloads}")
-        logger.info(f"  Failed downloads: {failed_downloads}")
-
-        return processed_results
-
-    def _download_and_parse_pdf_wrapper(self, result):
-        pdf_url = result['meta'].get('best_oa_location_pdf_url')
-        locations = result.get('locations', [])
-        
-        if not pdf_url or not pdf_url.strip():
-            pdf_url = None
-        
-        if pdf_url or locations:
-            return self._download_and_parse_pdf(pdf_url, locations)
+    def _get_arxiv_pdf_url(self, locations):
+        for location in locations:
+            landing_page_url = location.get('landing_page_url', '')
+            if 'arxiv.org/abs/' in landing_page_url:
+                return landing_page_url.replace('/abs/', '/pdf/') + '.pdf'
         return None
 
-    def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
-        results = []
-        total_count = 0
-        page = 1
-        total_retrieval_time = 0
+# Usage
+async def main():
+    openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
+                                           reranking_threshold=0.2, 
+                                           initial_top_to_retrieve=50,
+                                           chunk_size=1024,
+                                           max_concurrent_downloads=16)
+    try:
+        results = await openalex_search.search(
+            "How can natural language rationales improve reasoning in language models?", 
+            start_published_date="2020-01-01", end_published_date="2023-12-31")
+        print(results)
+    finally:
+        await openalex_search._close_session()
 
-        while len(results) < self.initial_top_to_retrieve:
-            url = self._get_search_url(query, sort, page)
-            
-            if start_published_date and end_published_date:
-                url += f"&filter=from_publication_date:{start_published_date},to_publication_date:{end_published_date}"
-
-            logger.debug(f"Sending request to URL: {url}")
-
-            headers = self._get_headers()
-            
-            cache_key = hashlib.md5(f"{url}{json.dumps(headers)}".encode()).hexdigest()
-            
-            if self.cache:
-                cached_response = self.cache.get(cache_key)
-                if cached_response is not None:
-                    logger.debug("Returning cached results")
-                    return cached_response
-            
-            try:
-                start_time = time.time()
-                response = self.session.get(url, headers=headers)
-                response.raise_for_status()
-                raw_results = response.json()
-                
-                end_time = time.time()
-                search_time = end_time - start_time
-                total_retrieval_time += search_time
-                
-                logger.info(f"Retrieved {len(raw_results['results'])} raw results from search in {search_time:.2f} seconds")
-                    
-                start_time = time.time()
-                page_results = self._filter_results(raw_results)
-                results.extend(page_results)
-                
-                end_time = time.time()
-                processing_time = end_time - start_time
-                
-                logger.info(f"Processed and chunked {len(page_results)} results (turned into {len(results)} results) in {processing_time:.2f} seconds")
-                
-                if page == 1:
-                    total_count = raw_results['meta']['count']
-                    if total_count <= self.per_page:
-                        break
-
-                if len(results) >= min(total_count, self.initial_top_to_retrieve):
-                    break
-
-                page += 1
-            except requests.exceptions.HTTPError as e:
-                logger.error(f"HTTP error occurred: {e}")
-                logger.error(f"Response content: {e.response.content}")
-                return {"error": str(e), "response_content": e.response.content.decode()}
-            except Exception as e:
-                logger.error(f"An error occurred during web search: {e}", exc_info=True)
-                return {"error": str(e)}
-
-        logger.info(f"Total time for all OpenAlex retrieval requests: {total_retrieval_time:.2f} seconds")
-
-        # After filtering results but before processing and reranking
-        results = self._process_pdf_results(results[:self.initial_top_to_retrieve])
-
-        processed_results = []
-        for result in results:
-            processed_results.extend(self._process_result(result))
-
-        reranked_results = self._rerank_results(query, processed_results, main_question)
-
-        # Log final merged results
-        logger.debug(f"Final merged results after reranking: {json.dumps(reranked_results, indent=2)}")
-
-        return {"results": reranked_results, "total_count": total_count}
-
-#%%
-# Example usage
-# web_search = BraveSearchClient()
-# brave_results = web_search.search("""reated with 2 and 120 h later, expression of the SASP factors CCL2, CCL8, CXCL1PCR. In HCT116p53+/+, SW48 and SW48 cells a weak induction of IL8 and CCL2 (2-4-fold) was observed after exposure toiplatin. A weak induction of CCL2 in LoVo cells was observed at 120 h (3-fold), whereas a strong induction of IL8 (8-fold) was observed both at 96 and 120 h. Furthermore, LoVo cells also exhibited an upregulation of CCL8 and IL6 (4-8 fold); induction of IL""", 
-#                              main_question="hey yo?")
-# top_3_brave_results = {"results": brave_results["results"][:3]}  # Get only the top 3 results
-# logger.info(f"Top 3 Brave search results: \n\n{json.dumps(top_3_brave_results, indent=2, sort_keys=False)}")
-
-# OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
-                                       reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=10,
-                                       chunk_size=1024)
-
-openalex_results_cited = openalex_search.search(
-    "How can natural language rationales improve reasoning in language models?", 
-    start_published_date="2020-01-01", end_published_date="2023-12-31")
-# %%
+if __name__ == "__main__":
+    asyncio.run(main())
