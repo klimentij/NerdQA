@@ -22,7 +22,7 @@ from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__, log_level="DEBUG")
 
 class SearchClient(ABC):
-    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, caching: bool = True, sort: str = None):
+    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, reranking_threshold: float = 0.2):
         self.session = requests.Session()
         retries = Retry(
             total=10,
@@ -45,6 +45,8 @@ class SearchClient(ABC):
         self.max_docs_to_rerank = max_docs_to_rerank
         self.num_results = num_results
         self.sort = sort
+        self.initial_top_to_retrieve = initial_top_to_retrieve
+        self.reranking_threshold = reranking_threshold
 
     @abstractmethod
     def _get_search_url(self, query: str) -> str:
@@ -89,9 +91,12 @@ class SearchClient(ABC):
             
             start_time = time.time()
             filtered_results = self._filter_results(raw_results)
+            initially_retrieved = len(filtered_results)
             processed_results = []
             for result in filtered_results:
                 processed_results.extend(self._process_result(result))
+            
+            after_chunking = len(processed_results)
             
             end_time = time.time()
             processing_time = end_time - start_time
@@ -104,11 +109,21 @@ class SearchClient(ABC):
             # Rerank the results if enabled
             reranked_results = self._rerank_results(query, processed_results, main_question)
             
+            after_reranking = len(reranked_results)
+            
             result = {"results": reranked_results}
             
             # Cache the result only if caching is enabled
             if self.cache:
                 self.cache.set(cache_key, result)
+            
+            # Add search summary log
+            logger.info(f"""
+Search Summary:
+- Initially retrieved results: {initially_retrieved}
+- Results after chunking: {after_chunking}
+- Results after reranking and threshold filtering: {after_reranking}
+""")
             
             return result
         except requests.exceptions.HTTPError as e:
@@ -218,25 +233,36 @@ Current query the user needs to answer to progress towards solving the main ques
             end_time = time.time()
             num_documents = min(len(results), self.max_docs_to_rerank)
             logger.info(f"Reranked {num_documents} documents in {end_time - start_time:.2f} seconds")
-            reranked_data = response.json()
 
             # Create a mapping of original index to new score
             index_to_score = {item['index']: item['relevance_score'] for item in reranked_data['results']}
 
             # Add scores to the original results and sort
             for i, result in enumerate(results):
-                result['relevance_score'] = index_to_score.get(i, 0)
+                result['meta']['reranker_score'] = index_to_score.get(i, 0)
 
-            results.sort(key=lambda x: x['relevance_score'], reverse=True)
-            return results
+            # Modify this part to apply the reranking threshold
+            filtered_results = [
+                result for result in results 
+                if result['meta'].get('reranker_score', 0) >= self.reranking_threshold
+            ]
+
+            # Sort the filtered results
+            filtered_results.sort(key=lambda x: x['meta']['reranker_score'], reverse=True)
+
+            # Add reranker rank to filtered results
+            for i, result in enumerate(filtered_results, 1):
+                result['meta']['reranker_rank'] = i
+
+            return filtered_results
 
         except Exception as e:
             logger.error(f"An error occurred during reranking: {e}")
             return results  # Return original results if reranking fails
 
 class BraveSearchClient(SearchClient):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, reranking_threshold: float = 0.2, **kwargs):
+        super().__init__(reranking_threshold=reranking_threshold, **kwargs)
         self.base_url = "https://api.search.brave.com/res/v1/web/search"
         self.api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
         if not self.api_key:
@@ -297,8 +323,8 @@ class BraveSearchClient(SearchClient):
         return self._chunk_text(text, meta, tokens)
 
 class ExaSearchClient(SearchClient):
-    def __init__(self, type: str = "neural", use_autoprompt: bool = True, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, **kwargs):
+        super().__init__(reranking_threshold=reranking_threshold, **kwargs)
         self.base_url = "https://api.exa.ai/search"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
         if not self.api_key:
@@ -358,14 +384,15 @@ class ExaSearchClient(SearchClient):
         return filtered_results
 
 class OpenAlexSearchClient(SearchClient):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, reranking_threshold: float = 0.2, **kwargs):
+        super().__init__(reranking_threshold=reranking_threshold, **kwargs)
         self.base_url = "https://api.openalex.org/works"
         self.headers = {
             'Accept': 'application/json'
         }
+        self.per_page = 200  # OpenAlex maximum per page
 
-    def _get_search_url(self, query: str, sort: str = None) -> str:
+    def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
         url = f"{self.base_url}?search={encoded_query}"
         url += f"&select=id,doi,title,relevance_score,publication_date,cited_by_count,topics,keywords,concepts,best_oa_location,abstract_inverted_index,updated_date,created_date"
@@ -374,7 +401,7 @@ class OpenAlexSearchClient(SearchClient):
         sort = sort or self.sort or "relevance_score:desc"
         url += f"&sort={sort}"
         
-        url += f"&per-page={self.num_results}"
+        url += f"&per-page={self.per_page}&page={page}"
         return url
 
     def _get_headers(self) -> dict:
@@ -384,106 +411,142 @@ class OpenAlexSearchClient(SearchClient):
         return None  # We don't need a payload for GET requests
 
     def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
-        url = self._get_search_url(query, sort)
-        
-        if start_published_date and end_published_date:
-            url += f"&filter=from_publication_date:{start_published_date},to_publication_date:{end_published_date}"
+        results = []
+        total_count = 0
+        page = 1
+        total_retrieval_time = 0
 
-        if kwargs.get("has_fulltext"):
-            url += "&filter=has_fulltext:true"
+        while len(results) < self.initial_top_to_retrieve:
+            url = self._get_search_url(query, sort, page)
+            
+            if start_published_date and end_published_date:
+                url += f"&filter=from_publication_date:{start_published_date},to_publication_date:{end_published_date}"
 
-        if kwargs.get("is_oa"):
-            url += "&filter=oa_status:gold|bronze|green"
+            logger.debug(f"Sending request to URL: {url}")
 
-        headers = self._get_headers()
-        
-        # Generate a cache key
-        cache_key = hashlib.md5(f"{url}{json.dumps(headers)}".encode()).hexdigest()
-        
-        # Check cache only if caching is enabled
-        if self.cache:
-            cached_response = self.cache.get(cache_key)
-            if cached_response is not None:
-                logger.debug("Returning cached results")
-                return cached_response
-        
-        try:
-            start_time = time.time()
-            response = self.session.get(url, headers=headers)
-            response.raise_for_status()
-            raw_results = response.json()
+            headers = self._get_headers()
             
-            end_time = time.time()
-            search_time = end_time - start_time
+            cache_key = hashlib.md5(f"{url}{json.dumps(headers)}".encode()).hexdigest()
             
-            logger.info(f"Retrieved raw results from search in {search_time:.2f} seconds")
-            
-            start_time = time.time()
-            filtered_results = self._filter_results(raw_results)
-            processed_results = []
-            for result in filtered_results:
-                processed_results.extend(self._process_result(result))
-            
-            end_time = time.time()
-            processing_time = end_time - start_time
-            
-            logger.info(f"Processed and chunked {len(filtered_results)} results (turned into {len(processed_results)} results) in {processing_time:.2f} seconds")
-            
-            # Rerank the results if enabled
-            reranked_results = self._rerank_results(query, processed_results, main_question)
-            
-            result = {"results": reranked_results}
-            
-            # Cache the result only if caching is enabled
             if self.cache:
-                self.cache.set(cache_key, result)
+                cached_response = self.cache.get(cache_key)
+                if cached_response is not None:
+                    logger.debug("Returning cached results")
+                    return cached_response
             
-            return result
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error occurred: {e}")
-            logger.error(f"Response content: {e.response.content}")
-            return {"error": str(e), "response_content": e.response.content.decode()}
-        except Exception as e:
-            logger.error(f"An error occurred during web search: {e}")
-            return {"error": str(e)}
+            try:
+                start_time = time.time()
+                response = self.session.get(url, headers=headers)
+                response.raise_for_status()
+                raw_results = response.json()
+                
+                end_time = time.time()
+                search_time = end_time - start_time
+                total_retrieval_time += search_time
+                
+                logger.info(f"Retrieved {len(raw_results['results'])} raw results from search in {search_time:.2f} seconds")
+                    
+                start_time = time.time()
+                page_results = self._filter_results(raw_results)
+                results.extend(page_results)
+                
+                end_time = time.time()
+                processing_time = end_time - start_time
+                
+                logger.info(f"Processed and chunked {len(page_results)} results (turned into {len(results)} results) in {processing_time:.2f} seconds")
+                
+                if page == 1:
+                    total_count = raw_results['meta']['count']
+                    if total_count <= self.per_page:
+                        break
+
+                if len(results) >= total_count:
+                    break
+
+                page += 1
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"HTTP error occurred: {e}")
+                logger.error(f"Response content: {e.response.content}")
+                return {"error": str(e), "response_content": e.response.content.decode()}
+            except Exception as e:
+                logger.error(f"An error occurred during web search: {e}", exc_info=True)
+                return {"error": str(e)}
+
+        logger.info(f"Total time for all OpenAlex retrieval requests: {total_retrieval_time:.2f} seconds")
+
+        processed_results = []
+        for result in results[:self.initial_top_to_retrieve]:
+            processed_results.extend(self._process_result(result))
+
+        reranked_results = self._rerank_results(query, processed_results, main_question)
+
+        # Log final merged results
+        logger.debug(f"Final merged results after reranking: {json.dumps(reranked_results, indent=2)}")
+
+        return {"results": reranked_results, "total_count": total_count}
 
     def _filter_results(self, response):
         results = response.get('results', [])
         filtered_results = []
 
         for result in results:
-            meta = {
-                'id': result.get('id', ''),
-                'title': result.get('title', ''),
-                'publication_date': result.get('publication_date', ''),
-                'cited_by_count': result.get('cited_by_count', 0),
-                'topics': ', '.join([topic.get('display_name', '') for topic in result.get('topics', [])]),
-                'keywords': ', '.join([keyword.get('display_name', '') for keyword in result.get('keywords', [])]),
-                'concepts': ', '.join([concept.get('display_name', '') for concept in result.get('concepts', [])]),
-                'best_oa_location': result.get('best_oa_location', {}).get('pdf_url', ''),
-            }
+            try:
+                meta = {
+                    'id': self._safe_get(result, 'id', ''),
+                    'title': self._safe_get(result, 'title', ''),
+                    'publication_date': self._safe_get(result, 'publication_date', ''),
+                    'cited_by_count': self._safe_get(result, 'cited_by_count', 0),
+                    'topics': self._safe_join(result, 'topics'),
+                    'keywords': self._safe_join(result, 'keywords'),
+                    'concepts': self._safe_join(result, 'concepts'),
+                    'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
+                    'openalex_score': self._safe_get(result, 'relevance_score', 0),  # Add OpenAlex score
+                }
 
-            abstract = self._reconstruct_abstract(result.get('abstract_inverted_index', {}))
+                abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
 
-            filtered_results.append({"text": abstract, "meta": meta})
+                filtered_results.append({"text": abstract, "meta": meta})
+            except Exception as e:
+                logger.warning(f"Error processing result: {e}", exc_info=True)
+                continue
+
+        # Sort by OpenAlex score and add rank
+        filtered_results.sort(key=lambda x: x['meta']['openalex_score'], reverse=True)
+        for i, result in enumerate(filtered_results, 1):
+            result['meta']['openalex_rank'] = i
 
         return filtered_results
 
+    def _safe_get(self, obj, key, default=None):
+        try:
+            return obj.get(key, default) if isinstance(obj, dict) else default
+        except Exception:
+            return default
+
+    def _safe_join(self, result, key):
+        try:
+            items = self._safe_get(result, key, [])
+            return ', '.join([self._safe_get(item, 'display_name', '') for item in items if isinstance(item, dict)])
+        except Exception:
+            return ''
+
     def _reconstruct_abstract(self, abstract_inverted_index):
-        if not abstract_inverted_index:
+        try:
+            if not isinstance(abstract_inverted_index, dict):
+                return ""
+
+            word_positions = []
+            for word, positions in abstract_inverted_index.items():
+                if isinstance(positions, list):
+                    for pos in positions:
+                        if isinstance(pos, int):
+                            word_positions.append((pos, word))
+
+            word_positions.sort()
+            return " ".join(word for _, word in word_positions)
+        except Exception as e:
+            logger.warning(f"Error reconstructing abstract: {e}", exc_info=True)
             return ""
-
-        # Create a list of (position, word) tuples
-        word_positions = []
-        for word, positions in abstract_inverted_index.items():
-            for pos in positions:
-                word_positions.append((pos, word))
-
-        # Sort the list by position
-        word_positions.sort()
-
-        # Join the words in order
-        return " ".join(word for _, word in word_positions)
 
     def _process_result(self, result: Dict) -> List[Dict]:
         meta = result.get("meta", {})
@@ -506,14 +569,8 @@ class OpenAlexSearchClient(SearchClient):
 # logger.info(f"Top 3 Brave search results: \n\n{json.dumps(top_3_brave_results, indent=2, sort_keys=False)}")
 
 # OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=False, caching=False)
+openalex_search = OpenAlexSearchClient(rerank=True, caching=False, reranking_threshold=0.2)
 
-# Default sort (by relevance_score:desc)
-openalex_results = openalex_search.search("How can natural language rationales improve reasoning in language models?", start_published_date="2020-01-01", end_published_date="2023-12-31")
-print("Default sort results:")
-print(json.dumps(openalex_results, indent=2, sort_keys=False))
-
-# Sort by cited_by_count:desc
 openalex_results_cited = openalex_search.search(
     "How can natural language rationales improve reasoning in language models?", 
     start_published_date="2020-01-01", end_published_date="2023-12-31")
