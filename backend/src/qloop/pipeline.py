@@ -27,10 +27,10 @@ class StatementGenerator:
         self.web_search = ExaSearchClient()
         self.skill = Completion(('QLoop', 'Statements'))
 
-    def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict) -> Tuple[List[dict], dict]:
-        logger.info(f"Generating statements for query: {current_query}")
+    def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict, start_date: str, end_date: str) -> Tuple[List[dict], dict]:
+        logger.info(f"Generating statements for query: {current_query} from {start_date} to {end_date}")
         
-        search_results = self.web_search.search(current_query, main_question)
+        search_results = self.web_search.search(current_query, main_question, start_date, end_date)
         filtered_results = search_results.get('results', [])
 
         result = self.skill.complete(

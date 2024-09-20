@@ -64,6 +64,10 @@
             margin-right: 15px;
         }
 
+        .preferences input[type="date"] {
+            width: 150px; /* Adjust the width as needed */
+        }
+
         #submitQuestion {
             padding: 15px 20px;
             font-size: 16px;
@@ -389,6 +393,12 @@
                 <label for="queriesInput">Number of Queries:</label>
                 <input type="number" id="queriesInput" value="1" min="1" max="5">
             </div>
+            <div class="preferences">
+                <label for="startDateInput">Start Publish Date:</label>
+                <input type="date" id="startDateInput" value="2000-01-20">
+                <label for="endDateInput">End Publish Date:</label>
+                <input type="date" id="endDateInput" value="">
+            </div>
             <button id="submitQuestion">Submit Question</button>
         </div>
     </div>
@@ -421,6 +431,8 @@
         const newButton = document.getElementById('newButton');
         const iterationsInput = document.getElementById('iterationsInput');
         const queriesInput = document.getElementById('queriesInput');
+        const startDateInput = document.getElementById('startDateInput');
+        const endDateInput = document.getElementById('endDateInput');
 
         let socket;
         let currentIteration = 0;
@@ -622,12 +634,16 @@
             const question = questionInput.value.trim();
             const iterations = parseInt(iterationsInput.value, 10);
             const numQueries = parseInt(queriesInput.value, 10);
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
 
             if (question && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     question: question,
                     iterations: iterations,
-                    num_queries: numQueries
+                    num_queries: numQueries,
+                    start_date: startDate,
+                    end_date: endDate
                 }));
                 questionScreen.style.display = 'none';
                 reportScreen.style.display = 'flex';

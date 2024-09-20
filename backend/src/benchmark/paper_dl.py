@@ -45,6 +45,7 @@ top_3_papers = df_2022.sort_values('numcitedby', ascending=False).head(3)
 
 # Select the second top paper
 d = top_3_papers.iloc[1].to_dict()
+d
 #%%
 # Remove { and } from title
 title = re.sub(r'[{}]', '', d['title'])
@@ -120,4 +121,3 @@ print(d['full_text'][-1000:])
 # %%
 d
 # %%
-title

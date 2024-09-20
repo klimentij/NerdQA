@@ -79,16 +79,16 @@ class PipelineOrchestrator:
     def get_current_history(self) -> str:
         return self.current_history
 
-    async def generate_statements(self, main_question: str, current_query: str, iteration: int, query_index: int):
+    async def generate_statements(self, main_question: str, current_query: str, iteration: int, query_index: int, start_date: str, end_date: str):
         logger.info(f"Generating statements with current history: {self.current_history}")
         metadata = self.get_metadata(iteration, query_index)
         statements, search_results = await asyncio.to_thread(
             self.statement_generator.generate_statements,
-            main_question, current_query, self.current_history, metadata
+            main_question, current_query, self.current_history, metadata, start_date, end_date
         )
         return statements, search_results
 
-    async def generate_next_queries(self, main_question: str, current_best_answer: str, num_queries: int, iteration: int):
+    async def generate_next_queries(self, main_question: str, current_best_answer: str, num_queries: int, iteration: int, start_date: str, end_date: str):
         logger.info(f"Generating queries with current history: {self.current_history}")
         metadata = self.get_metadata(iteration)
         next_queries = await asyncio.to_thread(
@@ -114,31 +114,33 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_json()
-            logger.info(f"Received data: {data}")  # Add this line
+            logger.info(f"Received data: {data}")
             if "question" in data:
                 main_question = data["question"]
                 iterations = data.get("iterations", 1)
                 num_queries = data.get("num_queries", 1)
+                start_date = data.get("start_date", "2000-01-20")
+                end_date = data.get("end_date", time.strftime("%Y-%m-%d"))
 
                 if not main_question:
                     await websocket.send_json({"error": "No question provided"})
                     continue
 
-                orchestrator.reset_ids()  # Reset trace and session IDs for new question
-                orchestrator.user_feedback = []  # Reset user feedback for new question
+                orchestrator.reset_ids()
+                orchestrator.user_feedback = []
                 orchestrator.current_history = ""
-                await run_pipeline(websocket, main_question, iterations, num_queries)
+                await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date)
             elif "feedback" in data:
                 feedback = data["feedback"]
-                logger.info(f"Feedback received: {feedback}")  # Add this line
+                logger.info(f"Feedback received: {feedback}")
                 orchestrator.add_user_feedback(feedback)
-                logger.info(f"Current history after adding feedback: {orchestrator.current_history}")  # Add this line
+                logger.info(f"Current history after adding feedback: {orchestrator.current_history}")
                 await websocket.send_json({"type": "feedback_received", "message": "Feedback received and incorporated into the current history."})
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
 
-async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int):
+async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str):
     orchestrator.main_question = main_question
     all_statements = {}
     all_evidence = {}
@@ -148,17 +150,15 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
 
     for iteration in range(iterations):
         if iteration == 0:
-            # Use the main question as the first query
             next_queries = [main_question]
         else:
-            # Generate queries for subsequent iterations
             next_queries = await orchestrator.generate_next_queries(
-                main_question, "", num_queries, iteration
+                main_question, "", num_queries, iteration, start_date, end_date
             )
 
         await websocket.send_json({
             "type": "queries",
-            "data": next_queries[:num_queries],  # Limit to requested number of queries
+            "data": next_queries[:num_queries],
             "iteration": iteration + 1
         })
 
@@ -167,18 +167,16 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
         new_statements = 0
         iteration_evidence_ids = set()
 
-        # Process queries and generate statements in parallel
         async def process_query(query_index, current_query):
             statements, search_results = await orchestrator.generate_statements(
-                main_question, current_query, iteration, query_index
+                main_question, current_query, iteration, query_index, start_date, end_date
             )
             return statements, search_results, query_index
 
-        tasks = [process_query(i+1, query) for i, query in enumerate(next_queries[:num_queries])]  # Limit to requested number of queries
+        tasks = [process_query(i+1, query) for i, query in enumerate(next_queries[:num_queries])]
         results = await asyncio.gather(*tasks)
 
         for statements, search_results, query_index in results:
-            # Process search results and statements
             if isinstance(search_results, list):
                 results = search_results
             elif isinstance(search_results, dict):
@@ -217,18 +215,13 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             for stmt in statements:
                 orchestrator.current_history += f"Statement {stmt['id']}: {stmt['text']}\n"
 
-        # Generate answer
         answer = await orchestrator.generate_answer(
             main_question, iteration
         )
 
-        # Extract cited statements from the answer
         cited_statements = set(re.findall(r'\[(S\d+)\]', answer))
-
-        # Generate full citation tree for cited statements
         full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
 
-        # Prepare iteration summary
         iteration_summary = {
             "iteration": iteration + 1,
             "new_evidence_found": new_evidence_found,
@@ -239,7 +232,6 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             "total_statements": total_statements
         }
 
-        # Send answer with full citation tree
         await websocket.send_json({
             "type": "answer",
             "data": answer,
@@ -248,7 +240,6 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             "full_citation_tree": full_citation_tree
         })
 
-        # Update current_history after each iteration
         orchestrator.current_history += f"\nIteration {iteration + 1} completed.\n"
 
 def generate_citation_tree_data(all_statements, all_evidence, max_depth=5):
