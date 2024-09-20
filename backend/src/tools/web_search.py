@@ -529,8 +529,8 @@ class ExaSearchClient(SearchClient):
 
 
 class OpenAlexSearchClient(SearchClient):
-    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, **kwargs):
-        super().__init__(reranking_threshold=reranking_threshold, **kwargs)
+    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, **kwargs):
+        super().__init__(reranking_threshold=reranking_threshold, max_concurrent_downloads=max_concurrent_downloads, **kwargs)
         self.base_url = "https://api.openalex.org/works"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
         if not self.api_key:
@@ -540,7 +540,7 @@ class OpenAlexSearchClient(SearchClient):
             **get_common_headers()
         }
         self.per_page = min(self.initial_top_to_retrieve, 200)  # Adjust per_page based on initial_top_to_retrieve
-        self.pdf_downloader = PDFDownloader(max_concurrent_downloads=16, retry_attempts=3)  # Set the number of concurrent downloads
+        self.pdf_downloader = PDFDownloader(max_concurrent_downloads=self.max_concurrent_downloads, retry_attempts=3)  # Set the number of concurrent downloads
 
     def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
@@ -726,7 +726,7 @@ openalex_search = OpenAlexSearchClient(rerank=True, caching=False,
                                        reranking_threshold=0.2, 
                                        initial_top_to_retrieve=50,
                                        chunk_size=1024,
-                                       max_concurrent_downloads=16)  # Set the number of concurrent downloads
+                                       max_concurrent_downloads=50)  # Set the number of concurrent downloads
 
 async def main():
     openalex_results_cited = await openalex_search.search(
