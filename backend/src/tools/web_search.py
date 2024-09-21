@@ -675,10 +675,6 @@ class OpenAlexSearchClient(SearchClient):
             if landing_page_url.startswith('https://arxiv.org/abs/'):
                 add_unique(self._transform_arxiv_link(landing_page_url))
 
-        # Log the results
-        logger.debug(f"OpenAlex ID: {result.get('id', 'Unknown')}")
-        logger.debug(f"Prioritized PDF links: {pdf_links}")
-
         return pdf_links
 
     def _transform_arxiv_link(self, url):
