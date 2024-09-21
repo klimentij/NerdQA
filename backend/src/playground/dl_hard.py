@@ -1,59 +1,98 @@
-import aiohttp
-import asyncio
 import os
+import logging
+import sys
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.chrome.options import Options
 
-class PDFDownloader:
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s:%(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+class PDFDownloaderSelenium:
     def __init__(self, download_url, save_path):
         self.download_url = download_url
         self.save_path = save_path
-        self.headers = {
-            'User-Agent': (
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
-                'AppleWebKit/537.36 (KHTML, like Gecko) '
-                'Chrome/112.0.0.0 Safari/537.36'
-            ),
-            'Accept': 'application/pdf,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Referer': 'https://effectivehealthcare.ahrq.gov/',  # Adjust if necessary
-            'Connection': 'keep-alive',
-        }
-
-    async def download_pdf(self):
+        self.download_dir = os.path.abspath(os.path.dirname(self.save_path))
+        
+        # Ensure the download directory exists
+        os.makedirs(self.download_dir, exist_ok=True)
+        logging.debug(f"Download directory set to: {self.download_dir}")
+        
+        # Configure Chrome options for Selenium
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")  # Run in headless mode
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_experimental_option("prefs", {
+            "download.default_directory": self.download_dir,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "plugins.always_open_pdf_externally": True  # Download PDFs instead of opening them
+        })
+        
+        # Initialize the Chrome WebDriver
+        try:
+            self.driver = webdriver.Chrome(options=chrome_options)
+            logging.debug("Initialized headless Chrome WebDriver.")
+        except Exception as e:
+            logging.exception(f"Failed to initialize Chrome WebDriver: {e}")
+            sys.exit(1)
+        
+    def download_pdf(self):
         """
-        Download the PDF file using aiohttp with appropriate headers.
+        Use Selenium to navigate to the PDF URL and download the file.
         """
         try:
-            async with aiohttp.ClientSession(headers=self.headers) as session:
-                async with session.get(self.download_url, allow_redirects=True) as response:
-                    if response.status == 403:
-                        print("Received 403 Forbidden. Attempting to adjust headers.")
-                        # Optionally, adjust headers or handle authentication here
-                        return
-                    response.raise_for_status()
-                    # Ensure the save directory exists
-                    os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
-                    with open(self.save_path, 'wb') as f:
-                        # Download in chunks to handle large files efficiently
-                        async for chunk in response.content.iter_chunked(1024):
-                            f.write(chunk)
-            print(f"PDF downloaded successfully and saved to {self.save_path}")
-        except aiohttp.ClientResponseError as cre:
-            print(f"Client response error: {cre.status}, {cre.message}")
+            logging.debug(f"Navigating to {self.download_url}")
+            self.driver.get(self.download_url)
+            
+            # Wait for download to complete
+            # Adjust the sleep time as necessary based on your network speed and server response
+            time.sleep(10)
+            
+            # Check if any files have been downloaded
+            if not os.path.exists(self.download_dir):
+                logging.error(f"Download directory does not exist: {self.download_dir}")
+                return
+            
+            downloaded_files = os.listdir(self.download_dir)
+            logging.debug(f"Files in download directory: {downloaded_files}")
+            
+            if not downloaded_files:
+                logging.error("No files were downloaded. Check the download process.")
+                return
+            
+            # Assuming the most recently downloaded file is the target PDF
+            latest_file_path = max(
+                [os.path.join(self.download_dir, f) for f in downloaded_files],
+                key=os.path.getctime
+            )
+            logging.debug(f"Latest downloaded file: {latest_file_path}")
+            
+            # Rename and move the downloaded file to the desired save_path
+            os.rename(latest_file_path, self.save_path)
+            logging.info(f"PDF downloaded successfully and saved to {self.save_path}")
+        except FileNotFoundError as fnf_error:
+            logging.error(f"File not found error: {fnf_error}")
         except Exception as e:
-            print(f"Error downloading PDF: {e}")
-
-    async def run(self):
-        """
-        Main method to orchestrate the PDF download process.
-        """
-        await self.download_pdf()
-
+            logging.exception(f"Error downloading PDF with Selenium: {e}")
+        finally:
+            self.driver.quit()
+            logging.debug("Chrome WebDriver session ended.")
+    
 if __name__ == "__main__":
     # URL of the PDF to download
-    TARGET_URL = "https://effectivehealthcare.ahrq.gov/sites/default/files/pdf/registries-evaluating-patient-outcomes-4th-edition.pdf"
+    TARGET_URL = "https://downloads.hindawi.com/journals/complexity/2021/6634811.pdf"
     
-    # Path where the PDF will be saved
-    SAVE_PATH = "downloads/registries-evaluating-patient-outcomes-4th-edition.pdf"
+    # Path where the PDF will be saved (including the filename)
+    SAVE_PATH = os.path.join("downloads", "6634811.pdf")
     
-    downloader = PDFDownloader(download_url=TARGET_URL, save_path=SAVE_PATH)
-    asyncio.run(downloader.run())
+    downloader = PDFDownloaderSelenium(download_url=TARGET_URL, save_path=SAVE_PATH)
+    downloader.download_pdf()

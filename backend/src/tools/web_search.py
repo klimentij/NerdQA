@@ -79,15 +79,24 @@ class PDFDownloader:
         self.successful_downloads = 0
         self.failed_downloads = 0
         self.cache_hits = 0  # New counter for cache hits
+        self.headers = {
+            'User-Agent': (
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/112.0.0.0 Safari/537.36'
+            ),
+            'Accept': 'application/pdf,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+        }
 
     async def download_and_parse_pdf(self, session: ClientSession, pdf_urls: List[str], openalex_id: str, title: str) -> Optional[str]:
         async with self.semaphore:
             for round in range(1, self.url_list_retry_rounds + 1):
                 for i, pdf_url in enumerate(pdf_urls, 1):
                     try:
-                        headers = get_common_headers()
-                        logger.debug(f"Attempting download with headers: {headers}")
-                        async with session.get(pdf_url, headers=headers, timeout=60, allow_redirects=True, ssl=self.ssl_context) as response:
+                        logger.debug(f"Attempting download with headers: {self.headers}")
+                        async with session.get(pdf_url, headers=self.headers, timeout=60, allow_redirects=True, ssl=self.ssl_context) as response:
                             logger.debug(f"Response status: {response.status}, Content-Type: {response.headers.get('Content-Type')}")
                             if response.status == 200 and response.headers.get('Content-Type', '').lower().startswith('application/pdf'):
                                 pdf_content = await response.read()
@@ -749,7 +758,7 @@ class OpenAlexSearchClient(SearchClient):
 # OpenAlex example usage
 openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=20,
+                                       initial_top_to_retrieve=50,
                                        chunk_size=1024,
                                        max_concurrent_downloads=50)  # Set the number of concurrent downloads
 
