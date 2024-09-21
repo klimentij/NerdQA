@@ -22,6 +22,7 @@ from aiohttp_retry import RetryClient, ExponentialRetry
 import certifi
 import ssl
 import random
+import traceback
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -62,107 +63,93 @@ def get_random_user_agent():
 
 def get_common_headers():
     return {
-        'User-Agent': get_random_user_agent(),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Cache-Control': 'max-age=0',
     }
 
 class PDFDownloader:
-    def __init__(self, max_concurrent_downloads: int = 5, retry_attempts: int = 3):
+    def __init__(self, max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2):
         self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
-        self.retry_options = ExponentialRetry(attempts=retry_attempts)
-    
-    async def download_and_parse_pdf(self, session: ClientSession, pdf_url: str, locations: List[Dict], title: str, openalex_id: str) -> Optional[str]:
+        self.url_list_retry_rounds = url_list_retry_rounds
+        self.ssl_context = ssl.create_default_context(cafile=certifi.where())
+        self.successful_downloads = 0
+        self.failed_downloads = 0
+        self.cache_hits = 0  # New counter for cache hits
+
+    async def download_and_parse_pdf(self, session: ClientSession, pdf_urls: List[str], openalex_id: str, title: str) -> Optional[str]:
         async with self.semaphore:
-            try:
-                headers = get_common_headers()
-                if pdf_url:
-                    logger.info(f"Attempting to download PDF from: {pdf_url}")
-                    async with session.get(pdf_url, headers=headers, timeout=30, allow_redirects=True) as response:
-                        if response.status == 200 and response.headers.get('Content-Type', '').lower().startswith('application/pdf'):
-                            pdf_content = await response.read()
-                            text_content = extract_text(BytesIO(pdf_content), laparams=LAParams())
-                            return text_content
-                        else:
-                            logger.warning(f"Failed to download PDF from {pdf_url}. Status code: {response.status}")
-                
-                # If pdf_url is None, empty, or download failed, try arXiv
-                arxiv_pdf_url = self._get_arxiv_pdf_url(locations)
-                if arxiv_pdf_url:
-                    logger.info(f"Attempting to download PDF from arXiv: {arxiv_pdf_url}")
-                    async with session.get(arxiv_pdf_url, headers=headers, timeout=30, allow_redirects=True) as response:
-                        if response.status == 200 and response.headers.get('Content-Type', '').lower().startswith('application/pdf'):
-                            pdf_content = await response.read()
-                            text_content = extract_text(BytesIO(pdf_content), laparams=LAParams())
-                            return text_content
-                        else:
-                            logger.warning(f"Failed to download PDF from arXiv: {arxiv_pdf_url}. Status code: {response.status}")
-                
-                logger.warning("No successful PDF download")
-                return None
-            except Exception as e:
-                logger.error(f"Error downloading or parsing PDF for '{title}' (OpenAlex ID: {openalex_id}): {e}")
-                return None
-    
-    def _get_arxiv_pdf_url(self, locations: List[Dict]) -> Optional[str]:
-        for location in locations:
-            landing_page_url = location.get('landing_page_url', '')
-            if 'arxiv.org/abs/' in landing_page_url:
-                return landing_page_url.replace('/abs/', '/pdf/') + '.pdf'
-        return None
-    
-    async def process_papers(self, results: List[Dict]) -> List[Dict]:
+            for round in range(1, self.url_list_retry_rounds + 1):
+                for i, pdf_url in enumerate(pdf_urls, 1):
+                    try:
+                        headers = get_common_headers()
+                        logger.debug(f"Attempting download with headers: {headers}")
+                        async with session.get(pdf_url, headers=headers, timeout=60, allow_redirects=True, ssl=self.ssl_context) as response:
+                            logger.debug(f"Response status: {response.status}, Content-Type: {response.headers.get('Content-Type')}")
+                            if response.status == 200 and response.headers.get('Content-Type', '').lower().startswith('application/pdf'):
+                                pdf_content = await response.read()
+                                text_content = extract_text(BytesIO(pdf_content), laparams=LAParams())
+                                self.successful_downloads += 1
+                                return text_content
+                            else:
+                                response_text = await response.text()
+                                logger.debug(f"URL p{i} ({pdf_url}) failed, status code: {response.status}, response text: {response_text[:500]}... Round {round}")
+                    except aiohttp.ClientResponseError as e:
+                        logger.debug(f"URL p{i} ({pdf_url}) failed: HTTP {e.status} - {e.message}. Round {round}")
+                    except aiohttp.ClientSSLError as e:
+                        logger.debug(f"URL p{i} ({pdf_url}) failed: SSL Error - {str(e)}. Round {round}")
+                    except asyncio.TimeoutError:
+                        logger.debug(f"URL p{i} ({pdf_url}) failed: Request timed out. Round {round}")
+                    except Exception as e:
+                        logger.debug(f"URL p{i} ({pdf_url}) failed: {str(e)}. Round {round}")
+                        logger.debug(f"Full traceback: {traceback.format_exc()}")
+                    
+                    if i < len(pdf_urls):
+                        logger.debug(f"Trying URL p{i+1} ({pdf_urls[i]}) round {round}")
+                    
+                    # Add a small delay between requests
+                    await asyncio.sleep(random.uniform(1, 3))
+            
+            logger.debug(f"All download attempts failed for '{title}' (OpenAlex ID: {openalex_id}). URLs tried: {pdf_urls}")
+            self.failed_downloads += 1
+            return None
+
+    async def process_papers(self, results: List[Dict], cache) -> List[Dict]:
         processed_results = []
-        successful_downloads = 0
-        failed_downloads = 0
-
-        async with RetryClient(raise_for_status=False, retry_options=self.retry_options) as retry_client:
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._get_ssl_context())) as session:
-                tasks = []
-                for result in results:
-                    title = result['meta'].get('title', 'Unknown Title')
-                    openalex_id = result['meta'].get('id', 'Unknown ID')
-                    pdf_url = result['meta'].get('best_oa_location_pdf_url')
-                    locations = result.get('locations', [])
-
-                    tasks.append(self.download_and_parse_pdf(session, pdf_url, locations, title, openalex_id))
-    
-                responses = await asyncio.gather(*tasks, return_exceptions=True)
-    
-                for result, pdf_text in zip(results, responses):
-                    title = result['meta'].get('title', 'Unknown Title')
-                    openalex_id = result['meta'].get('id', 'Unknown ID')
-    
-                    if isinstance(pdf_text, Exception):
-                        logger.error(f"Exception during PDF download for '{title}' (OpenAlex ID: {openalex_id}): {pdf_text}")
-                        failed_downloads += 1
-                        processed_results.append(result)
-                        continue
-    
-                    if pdf_text:
-                        result['text'] = pdf_text
-                        successful_downloads += 1
-                    else:
-                        failed_downloads += 1
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self.ssl_context)) as session:
+            tasks = []
+            for result in results:
+                openalex_id = result['meta'].get('id', 'Unknown ID')
+                cached_text = cache.get(openalex_id)
+                if cached_text:
+                    result['text'] = cached_text
                     processed_results.append(result)
-    
-        logger.info(f"PDF download summary:")
-        logger.info(f"  Successful downloads: {successful_downloads}")
-        logger.info(f"  Failed downloads: {failed_downloads}")
-    
+                    self.cache_hits += 1  # Increment cache hits
+                else:
+                    tasks.append(self.process_single_paper(session, result, cache))
+            
+            processed_results.extend(await asyncio.gather(*tasks))
+        
+        logger.debug(f"PDF download statistics: {self.successful_downloads} successful, {self.failed_downloads} failed, {self.cache_hits} cache hits")
         return processed_results
-    
-    def _get_ssl_context(self):
-        return ssl.create_default_context(cafile=certifi.where())
+
+    async def process_single_paper(self, session: ClientSession, result: Dict, cache) -> Dict:
+        title = result['meta'].get('title', 'Unknown Title')
+        openalex_id = result['meta'].get('id', 'Unknown ID')
+        pdf_urls = result['meta'].get('pdf_urls_by_priority', [])
+
+        pdf_text = await self.download_and_parse_pdf(session, pdf_urls, openalex_id, title)
+        
+        if pdf_text:
+            result['text'] = pdf_text
+            cache.set(openalex_id, pdf_text)
+        else:
+            result['text'] = result.get('text', '')  # Keep the original abstract if download fails
+        
+        return result
 
 class SearchClient(ABC):
     def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5):
@@ -529,7 +516,7 @@ class ExaSearchClient(SearchClient):
 
 
 class OpenAlexSearchClient(SearchClient):
-    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, **kwargs):
+    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2, **kwargs):
         super().__init__(reranking_threshold=reranking_threshold, max_concurrent_downloads=max_concurrent_downloads, **kwargs)
         self.base_url = "https://api.openalex.org/works"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
@@ -540,7 +527,8 @@ class OpenAlexSearchClient(SearchClient):
             **get_common_headers()
         }
         self.per_page = min(self.initial_top_to_retrieve, 200)  # Adjust per_page based on initial_top_to_retrieve
-        self.pdf_downloader = PDFDownloader(max_concurrent_downloads=self.max_concurrent_downloads, retry_attempts=3)  # Set the number of concurrent downloads
+        self.pdf_downloader = PDFDownloader(max_concurrent_downloads=self.max_concurrent_downloads, url_list_retry_rounds=url_list_retry_rounds)  # Set the number of concurrent downloads
+        self.pdf_cache = LocalCache()  # New cache for PDF content
 
     def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
@@ -634,7 +622,7 @@ class OpenAlexSearchClient(SearchClient):
         logger.info(f"Total time for all OpenAlex retrieval requests: {total_retrieval_time:.2f} seconds")
 
         # Use the PDFDownloader to process paper downloads
-        results = await self.pdf_downloader.process_papers(results[:self.initial_top_to_retrieve])
+        results = await self.pdf_downloader.process_papers(results[:self.initial_top_to_retrieve], self.pdf_cache)
 
         processed_results = []
         for result in results:
@@ -761,14 +749,14 @@ class OpenAlexSearchClient(SearchClient):
 # OpenAlex example usage
 openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=5,
+                                       initial_top_to_retrieve=20,
                                        chunk_size=1024,
                                        max_concurrent_downloads=50)  # Set the number of concurrent downloads
 
 async def main():
     openalex_results_cited = await openalex_search.search(
         "How can natural language rationales improve reasoning in language models?", 
-        start_published_date="2020-01-01", end_published_date="2023-12-31")
+        start_published_date="2020-01-01", end_published_date="2021-12-31")
 
 
 if __name__ == "__main__":
