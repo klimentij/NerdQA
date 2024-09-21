@@ -644,6 +644,46 @@ class OpenAlexSearchClient(SearchClient):
 
         return {"results": reranked_results, "total_count": total_count}
 
+    def _extract_prioritized_pdf_links(self, result):
+        pdf_links = []
+        seen = set()
+
+        def add_unique(url):
+            if url and url not in seen:
+                seen.add(url)
+                pdf_links.append(url)
+
+        # 1. Extract open_access.oa_url
+        open_access = result.get('open_access', {})
+        if open_access.get('is_oa') and open_access.get('oa_url'):
+            add_unique(open_access['oa_url'])
+
+        # 2. Extract best_oa_location.pdf_url
+        best_oa_location = result.get('best_oa_location', {})
+        if best_oa_location.get('pdf_url'):
+            add_unique(best_oa_location['pdf_url'])
+
+        # 3. Extract pdf_url from locations
+        locations = result.get('locations', [])
+        for location in locations:
+            if location.get('pdf_url'):
+                add_unique(location['pdf_url'])
+
+        # 4. Transform arXiv links
+        for location in locations:
+            landing_page_url = location.get('landing_page_url', '')
+            if landing_page_url.startswith('https://arxiv.org/abs/'):
+                add_unique(self._transform_arxiv_link(landing_page_url))
+
+        # Log the results
+        logger.debug(f"OpenAlex ID: {result.get('id', 'Unknown')}")
+        logger.debug(f"Prioritized PDF links: {pdf_links}")
+
+        return pdf_links
+
+    def _transform_arxiv_link(self, url):
+        return url.replace('/abs/', '/pdf/').replace('.pdf', '')
+
     def _filter_results(self, response):
         results = response.get('results', [])
         filtered_results = []
@@ -659,7 +699,8 @@ class OpenAlexSearchClient(SearchClient):
                     'keywords': self._safe_join(result, 'keywords'),
                     'concepts': self._safe_join(result, 'concepts'),
                     'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
-                    'openalex_score': self._safe_get(result, 'relevance_score', 0),  # Add OpenAlex score
+                    'openalex_score': self._safe_get(result, 'relevance_score', 0),
+                    'pdf_urls_by_priority': self._extract_prioritized_pdf_links(result),  # New field
                 }
 
                 abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
@@ -724,7 +765,7 @@ class OpenAlexSearchClient(SearchClient):
 # OpenAlex example usage
 openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=50,
+                                       initial_top_to_retrieve=5,
                                        chunk_size=1024,
                                        max_concurrent_downloads=50)  # Set the number of concurrent downloads
 
@@ -732,7 +773,7 @@ async def main():
     openalex_results_cited = await openalex_search.search(
         "How can natural language rationales improve reasoning in language models?", 
         start_published_date="2020-01-01", end_published_date="2023-12-31")
-    # print(openalex_results_cited)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
