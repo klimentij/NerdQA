@@ -1,98 +1,53 @@
 import os
-import logging
-import sys
-import time
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options
+from newspaper import Article
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s %(levelname)s:%(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+def download_and_extract_article(url, output_dir='downloaded_articles'):
+    """
+    Downloads a webpage from the given URL and extracts the article's text content using Newspaper3k.
 
-class PDFDownloaderSelenium:
-    def __init__(self, download_url, save_path):
-        self.download_url = download_url
-        self.save_path = save_path
-        self.download_dir = os.path.abspath(os.path.dirname(self.save_path))
-        
-        # Ensure the download directory exists
-        os.makedirs(self.download_dir, exist_ok=True)
-        logging.debug(f"Download directory set to: {self.download_dir}")
-        
-        # Configure Chrome options for Selenium
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Run in headless mode
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_experimental_option("prefs", {
-            "download.default_directory": self.download_dir,
-            "download.prompt_for_download": False,
-            "download.directory_upgrade": True,
-            "plugins.always_open_pdf_externally": True  # Download PDFs instead of opening them
-        })
-        
-        # Initialize the Chrome WebDriver
-        try:
-            self.driver = webdriver.Chrome(options=chrome_options)
-            logging.debug("Initialized headless Chrome WebDriver.")
-        except Exception as e:
-            logging.exception(f"Failed to initialize Chrome WebDriver: {e}")
-            sys.exit(1)
-        
-    def download_pdf(self):
-        """
-        Use Selenium to navigate to the PDF URL and download the file.
-        """
-        try:
-            logging.debug(f"Navigating to {self.download_url}")
-            self.driver.get(self.download_url)
-            
-            # Wait for download to complete
-            # Adjust the sleep time as necessary based on your network speed and server response
-            time.sleep(10)
-            
-            # Check if any files have been downloaded
-            if not os.path.exists(self.download_dir):
-                logging.error(f"Download directory does not exist: {self.download_dir}")
-                return
-            
-            downloaded_files = os.listdir(self.download_dir)
-            logging.debug(f"Files in download directory: {downloaded_files}")
-            
-            if not downloaded_files:
-                logging.error("No files were downloaded. Check the download process.")
-                return
-            
-            # Assuming the most recently downloaded file is the target PDF
-            latest_file_path = max(
-                [os.path.join(self.download_dir, f) for f in downloaded_files],
-                key=os.path.getctime
-            )
-            logging.debug(f"Latest downloaded file: {latest_file_path}")
-            
-            # Rename and move the downloaded file to the desired save_path
-            os.rename(latest_file_path, self.save_path)
-            logging.info(f"PDF downloaded successfully and saved to {self.save_path}")
-        except FileNotFoundError as fnf_error:
-            logging.error(f"File not found error: {fnf_error}")
-        except Exception as e:
-            logging.exception(f"Error downloading PDF with Selenium: {e}")
-        finally:
-            self.driver.quit()
-            logging.debug("Chrome WebDriver session ended.")
-    
+    Args:
+        url (str): The URL of the article to download.
+        output_dir (str): The directory where the extracted article will be saved.
+
+    Returns:
+        str: The path to the saved article text file.
+    """
+    try:
+        # Initialize the Article object
+        article = Article(url)
+
+        # Download and parse the article
+        article.download()
+        article.parse()
+
+        # Extract the title and sanitize it for use as a filename
+        title = article.title.strip().replace('/', '_').replace('\\', '_')
+        if not title:
+            title = "untitled_article"
+
+        # Extract the main text of the article
+        article_text = article.text
+        if not article_text:
+            print("Could not extract the article content.")
+            return ""
+
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Define the output file path
+        output_file = os.path.join(output_dir, f"{title}.txt")
+
+        # Save the extracted content to a text file
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(article_text)
+
+        print(f"Article content has been successfully extracted and saved to '{output_file}'.")
+        return output_file
+
+    except Exception as e:
+        print(f"An error occurred while fetching or extracting the article: {e}")
+        return ""
+
 if __name__ == "__main__":
-    # URL of the PDF to download
-    TARGET_URL = "https://downloads.hindawi.com/journals/complexity/2021/6634811.pdf"
-    
-    # Path where the PDF will be saved (including the filename)
-    SAVE_PATH = os.path.join("downloads", "6634811.pdf")
-    
-    downloader = PDFDownloaderSelenium(download_url=TARGET_URL, save_path=SAVE_PATH)
-    downloader.download_pdf()
+    article_url = "https://onlinelibrary.wiley.com/doi/10.1155/2021/6634811"
+    download_and_extract_article(article_url)

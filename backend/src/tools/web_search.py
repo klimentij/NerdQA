@@ -104,7 +104,12 @@ class PDFDownloader:
                                 self.successful_downloads += 1
                                 return text_content
                             else:
-                                response_text = await response.text()
+                                try:
+                                    # Attempt to decode with 'utf-8' and replace errors
+                                    response_text = await response.text(encoding='utf-8', errors='replace')
+                                except UnicodeDecodeError:
+                                    # Fallback if decoding fails
+                                    response_text = "<Unable to decode response content>"
                                 logger.debug(f"URL p{i} ({pdf_url}) failed, status code: {response.status}, response text: {response_text[:500]}... Round {round}")
                     except aiohttp.ClientResponseError as e:
                         logger.debug(f"URL p{i} ({pdf_url}) failed: HTTP {e.status} - {e.message}. Round {round}")
@@ -639,6 +644,8 @@ class OpenAlexSearchClient(SearchClient):
 
         reranked_results = self._rerank_results(query, processed_results, main_question)
 
+        logger.debug(f"Reranked results:\n\n {json.dumps(reranked_results, indent=2)}")
+
         return {"results": reranked_results, "total_count": total_count}
 
     def _extract_prioritized_pdf_links(self, result):
@@ -651,24 +658,22 @@ class OpenAlexSearchClient(SearchClient):
                 pdf_links.append(url)
 
         # 1. Extract open_access.oa_url
-        open_access = result.get('open_access', {})
-        if open_access.get('is_oa') and open_access.get('oa_url'):
-            add_unique(open_access['oa_url'])
+        open_access = self._safe_get(result, 'open_access', {})
+        if self._safe_get(open_access, 'is_oa'):
+            add_unique(self._safe_get(open_access, 'oa_url'))
 
         # 2. Extract best_oa_location.pdf_url
-        best_oa_location = result.get('best_oa_location', {})
-        if best_oa_location.get('pdf_url'):
-            add_unique(best_oa_location['pdf_url'])
+        best_oa_location = self._safe_get(result, 'best_oa_location', {})
+        add_unique(self._safe_get(best_oa_location, 'pdf_url'))
 
         # 3. Extract pdf_url from locations
-        locations = result.get('locations', [])
+        locations = self._safe_get(result, 'locations', [])
         for location in locations:
-            if location.get('pdf_url'):
-                add_unique(location['pdf_url'])
+            add_unique(self._safe_get(location, 'pdf_url'))
 
         # 4. Transform arXiv links
         for location in locations:
-            landing_page_url = location.get('landing_page_url', '')
+            landing_page_url = self._safe_get(location, 'landing_page_url', '')
             if landing_page_url.startswith('https://arxiv.org/abs/'):
                 add_unique(self._transform_arxiv_link(landing_page_url))
 
@@ -693,7 +698,7 @@ class OpenAlexSearchClient(SearchClient):
                     'concepts': self._safe_join(result, 'concepts'),
                     'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
                     'openalex_score': self._safe_get(result, 'relevance_score', 0),
-                    'pdf_urls_by_priority': self._extract_prioritized_pdf_links(result),  # New field
+                    'pdf_urls_by_priority': self._extract_prioritized_pdf_links(result),
                 }
 
                 abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
@@ -758,14 +763,15 @@ class OpenAlexSearchClient(SearchClient):
 # OpenAlex example usage
 openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=50,
+                                       initial_top_to_retrieve=20,
                                        chunk_size=1024,
-                                       max_concurrent_downloads=50)  # Set the number of concurrent downloads
+                                       max_concurrent_downloads=20)  # Set the number of concurrent downloads
 
 async def main():
     openalex_results_cited = await openalex_search.search(
-        "How can natural language rationales improve reasoning in language models?", 
-        start_published_date="2020-01-01", end_published_date="2021-12-31")
+        # "What are the ways to disrupt healthcare in the next 10 years?", 
+        "How can natural language rationales improve reasoning in language models?",
+        start_published_date="2022-01-01", end_published_date="2022-01-01")
 
 
 if __name__ == "__main__":
