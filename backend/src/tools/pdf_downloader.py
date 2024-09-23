@@ -1,3 +1,18 @@
+"""
+
+Based on 10 diverse sequential queries to OpenAlex API:
+
+Total successful downloads: 121
+Total failed downloads: 59
+Total cache hits: 0
+Average time per query: 71.58 seconds
+Total time for all queries: 644.26 seconds
+Fail rate: 32.78%
+
++ some papers have glued full text, not good!
+
+"""
+
 import os
 import sys
 import asyncio
