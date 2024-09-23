@@ -261,13 +261,20 @@ openalex_search = OpenAlexSearchClient(rerank=True,
                                        caching=False,  # Controls OpenAlex query caching
                                        use_pdf_cache=False,  # Controls PDF caching
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=5,
+                                       initial_top_to_retrieve=20,
                                        chunk_size=1024,
                                        max_concurrent_downloads=20)
 async def main():
 	queries = [
 		"How can natural language rationales improve reasoning in language models?",
-		"What are the ways to disrupt healthcare in the next 10 years?"
+		"What are the ways to disrupt healthcare in the next 10 years?",
+		"What are the latest advancements in quantum computing?",
+		"How does climate change impact global agriculture?",
+		"What are the ethical implications of artificial intelligence in warfare?",
+		"How can renewable energy sources be integrated into the existing power grid?",
+		"What are the psychological effects of social media on teenagers?",
+		"What are the most effective treatments for Alzheimer's disease?",
+		"How does blockchain technology enhance cybersecurity?"
 	]
 	
 	total_time = 0
@@ -293,6 +300,11 @@ async def main():
 	logger.info(f"Total cache hits: {openalex_search.pdf_downloader.cache_hits}")
 	logger.info(f"Average time per query: {average_time_per_query:.2f} seconds")
 	logger.info(f"Total time for all queries: {total_time:.2f} seconds")
+
+	# Calculate and log the fail rate
+	total_downloads = openalex_search.pdf_downloader.successful_downloads + openalex_search.pdf_downloader.failed_downloads
+	fail_rate = (openalex_search.pdf_downloader.failed_downloads / total_downloads) * 100 if total_downloads > 0 else 0
+	logger.info(f"Fail rate: {fail_rate:.2f}%")
 
 if __name__ == "__main__":
     asyncio.run(main())
