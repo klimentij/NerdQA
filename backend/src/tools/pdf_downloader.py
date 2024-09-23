@@ -21,13 +21,15 @@ logger = setup_logging(__file__, log_level="DEBUG")
 
 
 class PDFDownloader:
-    def __init__(self, max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2):
+    def __init__(self, max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2, use_cache: bool = True):
         self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
         self.url_list_retry_rounds = url_list_retry_rounds
         self.ssl_context = ssl.create_default_context(cafile=certifi.where())
         self.successful_downloads = 0
         self.failed_downloads = 0
-        self.cache_hits = 0  # New counter for cache hits
+        self.cache_hits = 0
+        self.use_cache = use_cache
+        self.cache = LocalCache() if use_cache else None
         self.headers = {
             'User-Agent': (
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
@@ -92,8 +94,8 @@ class PDFDownloader:
             tasks = []
             for result in results:
                 openalex_id = result['meta'].get('id', 'Unknown ID')
-                if cache:
-                    cached_text = cache.get(openalex_id)
+                if self.use_cache and self.cache:
+                    cached_text = self.cache.get(openalex_id)
                 else:
                     cached_text = None
 
@@ -102,14 +104,14 @@ class PDFDownloader:
                     processed_results.append(result)
                     self.cache_hits += 1  # Increment cache hits
                 else:
-                    tasks.append(self.process_single_paper(session, result, cache))
+                    tasks.append(self.process_single_paper(session, result))
             
             processed_results.extend(await asyncio.gather(*tasks))
         
         logger.debug(f"PDF download statistics: {self.successful_downloads} successful, {self.failed_downloads} failed, {self.cache_hits} cache hits")
         return processed_results
 
-    async def process_single_paper(self, session: ClientSession, result: Dict, cache) -> Dict:
+    async def process_single_paper(self, session: ClientSession, result: Dict) -> Dict:
         title = result['meta'].get('title', 'Unknown Title')
         openalex_id = result['meta'].get('id', 'Unknown ID')
         pdf_urls = result['meta'].get('pdf_urls_by_priority', [])
@@ -118,8 +120,8 @@ class PDFDownloader:
         
         if pdf_text:
             result['text'] = pdf_text
-            if cache:
-                cache.set(openalex_id, pdf_text)
+            if self.use_cache and self.cache:
+                self.cache.set(openalex_id, pdf_text)
         else:
             result['text'] = result.get('text', '')  # Keep the original abstract if download fails
         

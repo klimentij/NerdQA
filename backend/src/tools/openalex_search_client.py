@@ -26,7 +26,7 @@ from src.tools.pdf_downloader import PDFDownloader
 logger = setup_logging(__file__, log_level="DEBUG")
 
 class OpenAlexSearchClient(SearchClient):
-    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2, **kwargs):
+    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2, use_pdf_cache: bool = True, **kwargs):
         super().__init__(reranking_threshold=reranking_threshold, max_concurrent_downloads=max_concurrent_downloads, **kwargs)
         self.base_url = "https://api.openalex.org/works"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
@@ -37,8 +37,8 @@ class OpenAlexSearchClient(SearchClient):
             **get_common_headers()
         }
         self.per_page = min(self.initial_top_to_retrieve, 200)  # Adjust per_page based on initial_top_to_retrieve
-        self.pdf_downloader = PDFDownloader(max_concurrent_downloads=self.max_concurrent_downloads, url_list_retry_rounds=url_list_retry_rounds)  # Set the number of concurrent downloads
-        self.pdf_cache = LocalCache()  # New cache for PDF content
+        self.pdf_downloader = PDFDownloader(max_concurrent_downloads=self.max_concurrent_downloads, url_list_retry_rounds=url_list_retry_rounds, use_cache=use_pdf_cache)
+        self.pdf_cache = LocalCache() if use_pdf_cache else None
 
     def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
         encoded_query = urllib.parse.quote(query)
@@ -257,18 +257,42 @@ class OpenAlexSearchClient(SearchClient):
     
 
 # OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
+openalex_search = OpenAlexSearchClient(rerank=True, 
+                                       caching=False,  # Controls OpenAlex query caching
+                                       use_pdf_cache=False,  # Controls PDF caching
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=20,
+                                       initial_top_to_retrieve=5,
                                        chunk_size=1024,
-                                       max_concurrent_downloads=20)  # Set the number of concurrent downloads
-
+                                       max_concurrent_downloads=20)
 async def main():
-    openalex_results_cited = await openalex_search.search(
-        # "What are the ways to disrupt healthcare in the next 10 years?", 
-        "How can natural language rationales improve reasoning in language models?",
-        start_published_date="2022-01-01", end_published_date="2022-01-01")
+	queries = [
+		"How can natural language rationales improve reasoning in language models?",
+		"What are the ways to disrupt healthcare in the next 10 years?"
+	]
+	
+	total_time = 0
 
+	for query in queries:
+		start_time = time.time()
+		openalex_results = await openalex_search.search(
+			query,
+			start_published_date="2002-01-01", end_published_date="2024-01-01"
+		)
+		end_time = time.time()
+		
+		query_time = end_time - start_time
+		total_time += query_time
+		
+		logger.info(f"Query '{query}' took {query_time:.2f} seconds")
+		
+	average_time_per_query = total_time / len(queries)
+	
+	# Log the aggregate statistics from the PDFDownloader
+	logger.info(f"Total successful downloads: {openalex_search.pdf_downloader.successful_downloads}")
+	logger.info(f"Total failed downloads: {openalex_search.pdf_downloader.failed_downloads}")
+	logger.info(f"Total cache hits: {openalex_search.pdf_downloader.cache_hits}")
+	logger.info(f"Average time per query: {average_time_per_query:.2f} seconds")
+	logger.info(f"Total time for all queries: {total_time:.2f} seconds")
 
 if __name__ == "__main__":
     asyncio.run(main())
