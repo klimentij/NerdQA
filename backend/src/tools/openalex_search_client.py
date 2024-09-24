@@ -27,7 +27,7 @@ logger = setup_logging(__file__, log_level="DEBUG")
 
 class OpenAlexSearchClient(SearchClient):
     def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, 
-                 max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2, use_pdf_cache: bool = True, 
+                 max_concurrent_downloads: int = 50, url_list_retry_rounds: int = 1, use_pdf_cache: bool = True, 
                  downloader=None, use_chunking: bool = True, **kwargs):  # Add use_chunking parameter
         super().__init__(reranking_threshold=reranking_threshold, max_concurrent_downloads=max_concurrent_downloads, 
                          url_list_retry_rounds=url_list_retry_rounds, use_pdf_cache=use_pdf_cache, 

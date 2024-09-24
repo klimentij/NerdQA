@@ -9,6 +9,8 @@ import hashlib
 import time
 from typing import List, Tuple, Optional
 import markdown
+import asyncio
+from inspect import iscoroutinefunction
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -28,10 +30,15 @@ class StatementGenerator:
         self.web_search = web_search or ExaSearchClient()
         self.skill = Completion(('QLoop', 'Statements'))
 
-    def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict, start_date: str, end_date: str) -> Tuple[List[dict], dict]:
+    async def generate_statements(self, main_question, current_query, current_history, metadata, start_date, end_date):
         logger.info(f"Generating statements for query: {current_query} from {start_date} to {end_date}")
         
-        search_results = self.web_search.search(current_query, main_question, start_date, end_date)
+        if self.web_search:
+            if iscoroutinefunction(self.web_search.search):
+                search_results = await self.web_search.search(current_query, main_question, start_date, end_date)
+            else:
+                search_results = await asyncio.to_thread(self.web_search.search, current_query, main_question, start_date, end_date)
+        
         filtered_results = search_results.get('results', [])
 
         result = self.skill.complete(
@@ -39,7 +46,7 @@ class StatementGenerator:
                 "MAIN_QUESTION": main_question,
                 "QUERY": current_query,
                 "SEARCH_RESULTS": json.dumps(filtered_results),
-                "HISTORY": history
+                "HISTORY": current_history
             },
             completion_kwargs={"metadata": metadata}
         )

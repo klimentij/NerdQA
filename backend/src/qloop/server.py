@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
 import re
+from inspect import iscoroutinefunction
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -86,10 +87,17 @@ class PipelineOrchestrator:
     async def generate_statements(self, main_question: str, current_query: str, iteration: int, query_index: int, start_date: str, end_date: str):
         logger.info(f"Generating statements with current history: {self.current_history}")
         metadata = self.get_metadata(iteration, query_index)
-        statements, search_results = await asyncio.to_thread(
-            self.statement_generator.generate_statements,
-            main_question, current_query, self.current_history, metadata, start_date, end_date
-        )
+        
+        if iscoroutinefunction(self.statement_generator.generate_statements):
+            statements, search_results = await self.statement_generator.generate_statements(
+                main_question, current_query, self.current_history, metadata, start_date, end_date
+            )
+        else:
+            statements, search_results = await asyncio.to_thread(
+                self.statement_generator.generate_statements,
+                main_question, current_query, self.current_history, metadata, start_date, end_date
+            )
+        
         return statements, search_results
 
     async def generate_next_queries(self, main_question: str, current_best_answer: str, num_queries: int, iteration: int, start_date: str, end_date: str):
