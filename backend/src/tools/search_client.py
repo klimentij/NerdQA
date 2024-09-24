@@ -47,7 +47,8 @@ class SearchClient(ABC):
                  rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, 
                  caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, 
                  reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, 
-                 url_list_retry_rounds: int = 2, use_pdf_cache: bool = True, downloader=None):
+                 url_list_retry_rounds: int = 2, use_pdf_cache: bool = True, downloader=None,
+                 use_chunking: bool = True):  # Add this parameter
         self.session = requests.Session()
         retries = Retry(
             total=10,
@@ -78,6 +79,7 @@ class SearchClient(ABC):
         self.initial_top_to_retrieve = initial_top_to_retrieve
         self.reranking_threshold = reranking_threshold
         self.max_concurrent_downloads = max_concurrent_downloads
+        self.use_chunking = use_chunking  # Store the new parameter
 
     @abstractmethod
     def _get_search_url(self, query: str) -> str:
@@ -145,7 +147,7 @@ class SearchClient(ABC):
         tokens = self._tokenize(text)
         num_tokens = len(tokens)
         
-        if num_tokens <= self.max_document_size_tokens:
+        if not self.use_chunking or num_tokens <= self.max_document_size_tokens:
             return [self._format_text_as_json(text, meta=meta, num_tokens=num_tokens)]
         
         if num_tokens <= self.chunk_size:

@@ -28,10 +28,10 @@ logger = setup_logging(__file__, log_level="DEBUG")
 class OpenAlexSearchClient(SearchClient):
     def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, 
                  max_concurrent_downloads: int = 5, url_list_retry_rounds: int = 2, use_pdf_cache: bool = True, 
-                 downloader=None, **kwargs):
+                 downloader=None, use_chunking: bool = True, **kwargs):  # Add use_chunking parameter
         super().__init__(reranking_threshold=reranking_threshold, max_concurrent_downloads=max_concurrent_downloads, 
                          url_list_retry_rounds=url_list_retry_rounds, use_pdf_cache=use_pdf_cache, 
-                         downloader=downloader, **kwargs)
+                         downloader=downloader, use_chunking=use_chunking, **kwargs)  # Pass use_chunking to super().__init__
         self.base_url = "https://api.openalex.org/works"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
         if not self.api_key:
@@ -201,6 +201,7 @@ class OpenAlexSearchClient(SearchClient):
                     'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
                     'openalex_score': self._safe_get(result, 'relevance_score', 0),
                     'pdf_urls_by_priority': self._extract_prioritized_pdf_links(result),
+                    'text_type': 'abstract',  # Set default text_type to 'abstract'
                 }
 
                 abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
@@ -273,25 +274,26 @@ class OpenAlexSearchClient(SearchClient):
         return reranked
 
 # OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=True, 
-                                       caching=False,  # Controls OpenAlex query caching
-                                       use_pdf_cache=False,  # Controls PDF caching
+openalex_search = OpenAlexSearchClient(rerank=False, 
+                                       caching=True,
+                                       use_pdf_cache=True,
                                        reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=20,
+                                       initial_top_to_retrieve=100,
                                        chunk_size=1024,
-                                       max_concurrent_downloads=20)
+                                       max_concurrent_downloads=100,
+                                       use_chunking=False)  # Add this parameter
 async def main():
 	queries = [
-        # "What role does few-shot learning play in enhancing LLM reasoning capabilities?"
-		"How can natural language rationales improve reasoning in language models?",
-		"What are the ways to disrupt healthcare in the next 10 years?",
-		"What are the latest advancements in quantum computing?",
-		"How does climate change impact global agriculture?",
-		"What are the ethical implications of artificial intelligence in warfare?",
-		"How can renewable energy sources be integrated into the existing power grid?",
-		"What are the psychological effects of social media on teenagers?",
-		"What are the most effective treatments for Alzheimer's disease?",
-		"How does blockchain technology enhance cybersecurity?"
+        "Large language models"
+		# "How can natural language rationales improve reasoning in language models?",
+		# "What are the ways to disrupt healthcare in the next 10 years?",
+		# "What are the latest advancements in quantum computing?",
+		# "How does climate change impact global agriculture?",
+		# "What are the ethical implications of artificial intelligence in warfare?",
+		# "How can renewable energy sources be integrated into the existing power grid?",
+		# "What are the psychological effects of social media on teenagers?",
+		# "What are the most effective treatments for Alzheimer's disease?",
+		# "How does blockchain technology enhance cybersecurity?"
 	]
 	
 	total_time = 0
@@ -299,8 +301,10 @@ async def main():
 	for query in queries:
 		start_time = time.time()
 		openalex_results = await openalex_search.search(
-			query,
-			start_published_date="2002-01-01", end_published_date="2024-01-01",
+			query=query,
+            sort="cited_by_count:desc",
+			start_published_date="2024-08-01", 
+            end_published_date="2024-09-01",
 		)
 		end_time = time.time()
 		

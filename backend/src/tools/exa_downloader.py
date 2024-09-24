@@ -22,7 +22,7 @@ from src.util.setup_logging import setup_logging
 from src.db.local_cache import LocalCache
 from src.util.env_util import cfg
 
-logger = setup_logging(__file__, log_level="DEBUG")
+logger = setup_logging(__file__, log_level="INFO")
 
 class ExaDownloader:
     def __init__(self, max_concurrent_downloads: int = 50, url_list_retry_rounds: int = 1, use_cache: bool = True):
@@ -89,6 +89,7 @@ class ExaDownloader:
 
                 if cached_text:
                     result['text'] = cached_text
+                    result['meta']['text_type'] = 'full_text'  # Update text_type for cache hits
                     processed_results.append(result)
                     self.cache_hits += 1
                 else:
@@ -108,10 +109,12 @@ class ExaDownloader:
         
         if exa_text:
             result['text'] = exa_text
+            result['meta']['text_type'] = 'full_text'  # Update text_type to 'full_text'
             if self.use_cache and self.cache:
                 self.cache.set(openalex_id, exa_text)
         else:
             result['text'] = result.get('text', '')  # Keep the original abstract if download fails
+            # text_type remains 'abstract' as set in OpenAlexSearchClient
         
         return result
 
