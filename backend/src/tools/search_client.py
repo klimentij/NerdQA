@@ -10,6 +10,7 @@ import hashlib
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 from tokenizers import Tokenizer
+from src.tools.exa_downloader import ExaDownloader
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -42,7 +43,11 @@ def get_common_headers():
     }
 
 class SearchClient(ABC):
-    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5):
+    def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, 
+                 rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, 
+                 caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 1000, 
+                 reranking_threshold: float = 0.2, max_concurrent_downloads: int = 5, 
+                 url_list_retry_rounds: int = 2, use_pdf_cache: bool = True, downloader=None):
         self.session = requests.Session()
         retries = Retry(
             total=10,
@@ -51,6 +56,11 @@ class SearchClient(ABC):
             respect_retry_after_header=True
         )
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
+        self.downloader = downloader or ExaDownloader(
+            max_concurrent_downloads=max_concurrent_downloads,
+            url_list_retry_rounds=url_list_retry_rounds,
+            use_cache=use_pdf_cache
+        )
         self.cache = LocalCache() if caching else None
         self.max_document_size_tokens = max_document_size_tokens
         self.chunk_size = chunk_size
@@ -201,3 +211,6 @@ Current query the user needs to answer to progress towards solving the main ques
         except Exception as e:
             logger.error(f"An error occurred during reranking: {e}")
             return results
+
+    async def process_papers(self, results: List[Dict]) -> List[Dict]:
+        return await self.downloader.process_papers(results, self.cache)

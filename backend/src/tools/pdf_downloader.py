@@ -145,6 +145,7 @@ class PDFDownloader:
 
 async def main():
     pdf_url = "https://aclanthology.org/2022.findings-emnlp.508.pdf"
+    pdf_url = "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/j.1523-1739.2007.00676.x"
     openalex_id = "example_id"
     title = "Example Paper Title"
     
