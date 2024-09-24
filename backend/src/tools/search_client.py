@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 from tokenizers import Tokenizer
 from src.tools.exa_downloader import ExaDownloader
+from src.util.chunking_util import Chunker
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -80,6 +81,7 @@ class SearchClient(ABC):
         self.reranking_threshold = reranking_threshold
         self.max_concurrent_downloads = max_concurrent_downloads
         self.use_chunking = use_chunking  # Store the new parameter
+        self.chunker = Chunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)  # Initialize Chunker
 
     @abstractmethod
     def _get_search_url(self, query: str) -> str:
@@ -153,7 +155,8 @@ class SearchClient(ABC):
         if num_tokens <= self.chunk_size:
             return [self._format_text_as_json(text, meta=meta, num_tokens=num_tokens)]
         
-        return self._chunk_text(text, meta, tokens)
+        chunked_results = self.chunker.chunk_text(text, meta)
+        return [self._format_text_as_json(chunk["text"], meta=chunk["meta"], num_tokens=chunk["num_tokens"]) for chunk in chunked_results]
 
     def _rerank_results(self, query: str, results: List[Dict], main_question: str = None) -> List[Dict]:
         if not self.rerank:
