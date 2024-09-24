@@ -1,13 +1,9 @@
 import os
 import sys
-import requests
-import io
 import time
-from PyPDF2 import PdfReader
+import json
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
-import re
-import json
 
 # Set up paths
 os.chdir(__file__.split('src/')[0])
@@ -18,12 +14,11 @@ from src.util.setup_logging import setup_logging
 
 logger = setup_logging(__file__)
 
-# Pydantic model for report generation output
+# Pydantic models (unchanged)
 class ReportGenerationOutput(BaseModel):
     reflection: str
-    report: str  # Updated field name to match the response format
+    report: str
 
-# Pydantic model for question generation output
 class QuestionGenerationOutput(BaseModel):
     reflection: str
     question: str
@@ -36,28 +31,6 @@ def create_metadata(trace_name: str, trace_id: str, session_id: str) -> Dict[str
         "session_id": session_id
     }
 
-def download_pdf(url: str) -> bytes:
-    logger.info(f"Downloading PDF from {url}")
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.content
-
-def pdf_to_text(pdf_content: bytes) -> str:
-    logger.info("Converting PDF to text")
-    pdf_file = io.BytesIO(pdf_content)
-    pdf_reader = PdfReader(pdf_file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
-
-def split_into_sentences(text: str, min_length: int = 100) -> list:
-    # Regular expression to split text into sentences
-    sentence_endings = re.compile(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s')
-    sentences = sentence_endings.split(text)
-    # Filter sentences to ensure they meet the minimum length requirement
-    return [sentence.strip() for sentence in sentences if sentence and len(sentence) >= min_length]
-
 def generate_report(formatted_snippets: str, metadata: Dict[str, str]) -> ReportGenerationOutput:
     logger.info("Generating report using the Report skill")
     skill = Completion(('BenchPaperCompress', 'Report'))
@@ -67,7 +40,6 @@ def generate_report(formatted_snippets: str, metadata: Dict[str, str]) -> Report
         completion_kwargs={"metadata": metadata}
     )
     
-    # Parse the result.content string into a dictionary
     try:
         content_dict = json.loads(result.content)
     except json.JSONDecodeError:
@@ -85,7 +57,6 @@ def generate_question(report: str, metadata: Dict[str, str]) -> QuestionGenerati
         completion_kwargs={"metadata": metadata}
     )
     
-    # Parse the result.content string into a dictionary
     try:
         content_dict = json.loads(result.content)
     except json.JSONDecodeError:
@@ -95,41 +66,44 @@ def generate_question(report: str, metadata: Dict[str, str]) -> QuestionGenerati
     return QuestionGenerationOutput(**content_dict)
 
 def main():
-    # 1. Download the PDF
-    pdf_url = "https://arxiv.org/pdf/2201.11903"
-    # pdf_url = "https://arxiv.org/pdf/2408.06292"
-    # pdf_url = "https://www.ijisrt.com/assets/upload/files/IJISRT24JUL244.pdf"
-    pdf_content = download_pdf(pdf_url)
+    # Load the seed papers JSON file
+    input_file = os.path.join(os.path.dirname(__file__), "data", "seed_papers.json")
+    with open(input_file, 'r') as f:
+        seed_papers = json.load(f)
+
+    # Take the first paper from the list
+    paper = seed_papers[0]
 
     # Create common metadata for the entire pipeline
     pipeline_start_ts = int(time.time())
-    trace_name = f"Paper Compress BM from {pdf_url}"
+    trace_name = f"Paper Compress BM for {paper['meta']['title']}"
     trace_id = f"T{pipeline_start_ts}"
     session_id = f"S{pipeline_start_ts}"
 
-    # 2. Convert PDF to text
-    paper_text = pdf_to_text(pdf_content)
+    # Use the pre-parsed text from the JSON file
+    paper_text = paper['text']
 
-    # 3. Split paper text into indexed snippets
-    snippets = split_into_sentences(paper_text)
+    # Convert paper text to the desired string format
+    formatted_snippets = "\n".join([f"s{i+1}: {snippet}" for i, snippet in enumerate(paper_text.split('\n'))])
 
-    # Convert snippets to the desired string format
-    formatted_snippets = "\n".join([f"s{i+1}: {snippet}" for i, snippet in enumerate(snippets)])
-
-    # 4. Generate report using the Report skill
+    # Generate report using the Report skill
     metadata = create_metadata(trace_name, trace_id, session_id)
     report_result = generate_report(formatted_snippets, metadata)
 
-    # 5. Log the resulting report
-    logger.info("Generated report:")
-    logger.info(report_result.report)
-
-    # 6. Generate question based on the report
+    # Generate question based on the report
     question_result = generate_question(report_result.report, metadata)
 
-    # 7. Log the resulting question
-    logger.info("Generated question:")
-    logger.info(question_result.question)
+    # Add generated report and question to the paper data
+    paper['report_generated'] = report_result.report
+    paper['question_generated'] = question_result.question
+
+    # Save the updated paper data to a new JSON file
+    output_file = os.path.join(os.path.dirname(__file__), "data", "seed_papers_with_qa.json")
+    with open(output_file, 'w') as f:
+        json.dump([paper], f, indent=2)
+
+    logger.info(f"Generated report and question for paper: {paper['meta']['title']}")
+    logger.info(f"Results saved to: {output_file}")
 
 if __name__ == "__main__":
     main()

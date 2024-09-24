@@ -21,8 +21,8 @@ class Config:
     end_published_date: str = "2024-09-01"
 
     # OpenAlexSearchClient parameters
-    caching: bool = False
-    use_pdf_cache: bool = False
+    caching: bool = True
+    use_pdf_cache: bool = True
     initial_top_to_retrieve: int = 200
 
     # Output parameters
