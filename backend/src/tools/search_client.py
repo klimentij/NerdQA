@@ -96,12 +96,85 @@ class SearchClient(ABC):
         pass
 
     @abstractmethod
-    def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
-        pass
-
-    @abstractmethod
     def _filter_results(self, response):
         pass
+
+    def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
+        url = self._get_search_url(query)
+        headers = self._get_headers()
+        payload = self._get_payload(query, start_published_date, end_published_date, **kwargs)
+        
+        # Generate a cache key
+        cache_key = hashlib.md5(f"{url}{json.dumps(headers)}{json.dumps(payload)}".encode()).hexdigest()
+        
+        # Check cache only if caching is enabled
+        if self.cache:
+            cached_response = self.cache.get(cache_key)
+            if cached_response is not None:
+                logger.debug("Returning cached results")
+                return cached_response
+        
+        try:
+            start_time = time.time()
+            if payload:
+                response = self.session.post(url, headers=headers, json=payload)
+            else:
+                response = self.session.get(url, headers=headers)
+            response.raise_for_status()
+            raw_results = response.json()
+            
+            end_time = time.time()
+            search_time = end_time - start_time
+            
+            logger.info(f"Retrieved raw results from search in {search_time:.2f} seconds")
+            
+            start_time = time.time()
+            filtered_results = self._filter_results(raw_results)
+            initially_retrieved = len(filtered_results)
+            processed_results = []
+            for result in filtered_results:
+                processed_results.extend(self._process_result(result))
+            
+            after_chunking = len(processed_results)
+            
+            end_time = time.time()
+            processing_time = end_time - start_time
+            
+            logger.info(f"Processed and chunked {len(filtered_results)} results (turned into {len(processed_results)} results) in {processing_time:.2f} seconds")
+            
+            # Log unchunked results before reranker
+            logger.info(f"Unchunked results before reranker: {json.dumps(filtered_results, indent=2)}")
+            
+            # Rerank the results if enabled
+            reranked_results = self._rerank_results(query, processed_results, main_question)
+            
+            after_reranking = len(reranked_results)
+            
+            result = {"results": reranked_results}
+            
+            # Cache the result only if caching is enabled
+            if self.cache:
+                self.cache.set(cache_key, result)
+            
+            # Add search summary log
+            logger.info(f"""
+Search Summary:
+- Initially retrieved results: {initially_retrieved}
+- Results after chunking: {after_chunking}
+- Results after reranking and threshold filtering: {after_reranking}
+""")
+            
+            return result
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                logger.warning(f"Rate limit exceeded (429 error). Retrying...")
+                raise
+            logger.error(f"HTTP error occurred: {e}")
+            logger.error(f"Response content: {e.response.content.decode()}")
+            return {"error": str(e), "response_content": e.response.content.decode()}
+        except Exception as e:
+            logger.error(f"An error occurred during web search: {e}")
+            return {"error": str(e)}
 
     def _format_text_as_json(self, text, meta=None, num_tokens=None):
         text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)

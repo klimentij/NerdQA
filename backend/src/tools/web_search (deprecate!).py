@@ -785,7 +785,7 @@ exa_search = ExaSearchClient(rerank=True, caching=False,
 
 def main():
     exa_results = exa_search.search(
-        "What are the latest advancements in quantum computing?",
+        "What are th    latest advancements in quantum computing?",
         start_published_date="2023-01-01", 
         end_published_date="2023-12-31",
         type="neural",

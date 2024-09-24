@@ -111,27 +111,30 @@ class ExaSearchClient(SearchClient):
         return filtered_results
     
 
-def main():
-    # Example usage of ExaSearchClient
-    client = ExaSearchClient(rerank=True, caching=False, 
+
+# Exa example usage
+exa_search = ExaSearchClient(rerank=True, caching=False, 
                              reranking_threshold=0.2, 
                              initial_top_to_retrieve=20,
                              chunk_size=1024)
+
+def main():
+    exa_results = exa_search.search(
+        "What are the latest advancements in quantum computing?",
+        start_published_date="2023-01-01", 
+        end_published_date="2023-12-31",
+        type="neural",
+        use_autoprompt=True
+    )
     
-    query = "Latest advancements in artificial intelligence"
-    start_date = "2023-01-01"
-    end_date = "2023-12-31"
-    
-    results = client.search(query, start_published_date=start_date, end_published_date=end_date)
-    
-    print(f"Search Results for: {query}")
-    for i, result in enumerate(results, 1):
+    print(f"Total results: {len(exa_results['results'])}")  
+    for i, result in enumerate(exa_results['results'][:5], 1):
         print(f"\nResult {i}:")
-        print(f"Title: {result['meta']['title']}")
-        print(f"URL: {result['meta']['url']}")
-        print(f"Author: {result['meta']['author']}")
-        print(f"Published Date: {result['meta']['published_date']}")
-        print(f"Text: {result['text'][:200]}...")  # Print first 200 characters of the text
+        print(f"Title: {result['meta'].get('title', 'N/A')}")
+        print(f"URL: {result['meta'].get('url', 'N/A')}")
+        print(f"Published Date: {result['meta'].get('published_date', 'N/A')}")
+        print(f"Reranker Score: {result['meta'].get('reranker_score', 'N/A')}")
+        print(f"Text snippet: {result['text'][:200]}...")
 
 if __name__ == "__main__":
     main()
