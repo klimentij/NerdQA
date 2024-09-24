@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import json
@@ -95,10 +96,10 @@ def main():
 
         # Use the chunker to produce snippets
         chunks = chunker.chunk_text(paper_text, {})
-        snippets = [f"s{i+1}: {chunk['text']}" for i, chunk in enumerate(chunks)]
+        snippets = {f"s{i+1}": chunk['text'] for i, chunk in enumerate(chunks)}
         
         paper_with_snippets_no_text = {k: v for k, v in paper.items() if k != 'text'}
-        paper_with_snippets_no_text['formatted_snippets'] = "\n".join(snippets)
+        paper_with_snippets_no_text['formatted_snippets'] = json.dumps(snippets)
         paper['snippets'] = snippets
 
         # Generate report using the Report skill
@@ -110,7 +111,27 @@ def main():
 
         # Add generated report and question to the paper data
         paper['question_generated'] = question_result.question
-        paper['report_generated'] = report_result.report
+        paper['golden_answer_generated'] = report_result.report
+
+        # Add only the used snippets as references
+        # Updated regex to find the used snippets in the report using special brackets
+        used_snippet_ids = re.findall(r'【s(\d+)】', report_result.report)
+        
+        # Convert snippet IDs to integers and sort them
+        used_snippet_ids = sorted(set(map(int, used_snippet_ids)))
+        
+        # Create a list of used snippets with surrounding context
+        max_snippet_id = len(snippets)
+        used_snippets_with_context = set()
+        for snippet_id in used_snippet_ids:
+            for context_id in range(max(1, snippet_id - 1), min(max_snippet_id, snippet_id + 2)):
+                used_snippets_with_context.add(context_id)
+        
+        # Sort the final list of snippet IDs
+        used_snippets_with_context = sorted(used_snippets_with_context)
+        
+        # Add the used snippets (with context) to the paper data
+        paper['used_snippets_with_context'] = {f"s{i}": snippets[f"s{i}"] for i in used_snippets_with_context}
 
     # Save the updated paper data to a new JSON file
     output_file = os.path.join(os.path.dirname(__file__), "data", "seed_papers_with_qa.json")

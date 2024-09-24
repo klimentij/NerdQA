@@ -43,7 +43,7 @@ class ExaDownloader:
         }
         self.exa_api_url = "https://api.exa.ai/contents"
 
-    async def fetch_content_from_exa(self, session: ClientSession, pdf_urls: List[str], openalex_id: str, title: str) -> Optional[str]:
+    async def fetch_content_from_exa(self, session: ClientSession, pdf_urls: List[str], openalex_id: str, title: str) -> Optional[tuple]:
         async with self.semaphore:
             for round in range(1, self.url_list_retry_rounds + 1):
                 for i, pdf_url in enumerate(pdf_urls, 1):
@@ -59,22 +59,17 @@ class ExaDownloader:
                                 data = await response.json()
                                 if data.get('results') and data['results'][0].get('text'):
                                     self.successful_downloads += 1
-                                    return data['results'][0]['text']
+                                    return data['results'][0]['text'], pdf_url  # Return the text and the successful URL
                             logger.debug(f"URL p{i} ({pdf_url}) failed, status code: {response.status}. Round {round}")
-                    except aiohttp.ClientResponseError as e:
-                        logger.debug(f"URL p{i} ({pdf_url}) failed: HTTP {e.status} - {e.message}. Round {round}")
-                    except asyncio.TimeoutError:
-                        logger.debug(f"URL p{i} ({pdf_url}) failed: Request timed out. Round {round}")
                     except Exception as e:
                         logger.debug(f"URL p{i} ({pdf_url}) failed: {str(e)}. Round {round}")
-                        logger.debug(f"Full traceback: {traceback.format_exc()}")
                     
                     if i < len(pdf_urls):
                         logger.debug(f"Trying URL p{i+1} ({pdf_urls[i]}) round {round}")
                     
             logger.debug(f"All download attempts failed for '{title}' (OpenAlex ID: {openalex_id}). URLs tried: {pdf_urls}")
             self.failed_downloads += 1
-            return None
+            return None, None  # Return None for both text and URL if all attempts fail
 
     async def process_papers(self, results: List[Dict], cache) -> List[Dict]:
         processed_results = []
@@ -105,16 +100,17 @@ class ExaDownloader:
         openalex_id = result['meta'].get('id', 'Unknown ID')
         pdf_urls = result['meta'].get('pdf_urls_by_priority', [])
 
-        exa_text = await self.fetch_content_from_exa(session, pdf_urls, openalex_id, title)
+        exa_text, successful_url = await self.fetch_content_from_exa(session, pdf_urls, openalex_id, title)
         
         if exa_text:
             result['text'] = exa_text
-            result['meta']['text_type'] = 'full_text'  # Update text_type to 'full_text'
+            result['meta']['text_type'] = 'full_text'
+            result['meta']['successful_pdf_url'] = successful_url  # Add the successful URL to meta
             if self.use_cache and self.cache:
                 self.cache.set(openalex_id, exa_text)
         else:
-            result['text'] = result.get('text', '')  # Keep the original abstract if download fails
-            # text_type remains 'abstract' as set in OpenAlexSearchClient
+            result['text'] = result.get('text', '')
+            result['meta']['successful_pdf_url'] = None  # Set to None if download fails
         
         return result
 

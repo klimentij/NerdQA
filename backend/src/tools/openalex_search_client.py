@@ -23,8 +23,6 @@ from src.util.setup_logging import setup_logging
 from src.tools.search_client import SearchClient, get_common_headers
 from src.tools.exa_downloader import ExaDownloader
 
-logger = setup_logging(__file__, log_level="DEBUG")
-
 class OpenAlexSearchClient(SearchClient):
     def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, 
                  max_concurrent_downloads: int = 50, url_list_retry_rounds: int = 1, use_pdf_cache: bool = True, 
@@ -201,7 +199,8 @@ class OpenAlexSearchClient(SearchClient):
                     'best_oa_location_pdf_url': self._safe_get(self._safe_get(result, 'best_oa_location', {}), 'pdf_url', ''),
                     'openalex_score': self._safe_get(result, 'relevance_score', 0),
                     'pdf_urls_by_priority': self._extract_prioritized_pdf_links(result),
-                    'text_type': 'abstract',  # Set default text_type to 'abstract'
+                    'text_type': 'abstract',
+                    'successful_pdf_url': None,  # Initialize this field
                 }
 
                 abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
@@ -253,6 +252,12 @@ class OpenAlexSearchClient(SearchClient):
     def _process_result(self, result: Dict) -> List[Dict]:
         logger.debug(f"Processing result: {json.dumps(result, indent=2)}")
         processed = super()._process_result(result)
+        
+        # Update the URL in meta to the successful PDF URL if it exists
+        for item in processed:
+            if item['meta'].get('successful_pdf_url'):
+                item['meta']['url'] = item['meta']['successful_pdf_url']
+        
         logger.debug(f"Processed result: {json.dumps(processed, indent=2)}")
         return processed
     

@@ -8,6 +8,7 @@ uvicorn src.qloop.server:app --reload
 import asyncio
 import json
 import os
+import random
 import sys
 from typing import List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 import time
 import re
 from inspect import iscoroutinefunction
+import hashlib
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -57,9 +59,10 @@ class PipelineOrchestrator:
         self.current_history = ""
 
     def reset_ids(self):
-        self.pipeline_start_ts = int(time.time())
-        self.trace_id = f"T{self.pipeline_start_ts}"
-        self.session_id = f"S{self.pipeline_start_ts}"
+        self.pipeline_start_ts = str(int(time.time()))
+        question_hash = hashlib.md5(self.main_question.encode()).hexdigest()[-4:]
+        self.trace_id = f"T{self.pipeline_start_ts}-{question_hash}"
+        self.session_id = f"S{self.pipeline_start_ts}-{question_hash}"
 
     def get_metadata(self, iteration=None, query_index=None):
         metadata = {
@@ -332,12 +335,19 @@ def generate_full_citation_tree(all_statements, all_evidence, cited_statements, 
                 }
         elif node_id.startswith('E'):
             evidence = all_evidence.get(node_id, {})
-            return {
+            reference = {
                 'id': node_id,
                 'text': evidence.get('text', "Evidence text not found"),
-                'url': evidence.get('meta', {}).get('url', ''),
-                'children': []
+                'url': evidence.get('meta', {}).get('url', "")
             }
+            if reference['url'] == "":
+                # possibly a paper
+                reference['url'] = evidence.get('meta', {}).get('id', '')
+                reference['title'] = evidence.get('meta', {}).get('title', "")
+                reference['publication_date'] = evidence.get('meta', {}).get('publication_date', "")
+
+            return reference
+
         return None
 
     trees = {}
