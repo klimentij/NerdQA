@@ -15,16 +15,17 @@ os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 
 from src.llm.completion import Completion
-from src.tools.web_search import ExaSearchClient
+from src.tools.search_client import SearchClient
+from src.tools.exa_search_client import ExaSearchClient
 from src.util.setup_logging import setup_logging
 
-logger = setup_logging(__file__)
+logger = setup_logging(__file__, "DEBUG")
 
 STATEMENT_ID_DIGITS = 10
 
 class StatementGenerator:
-    def __init__(self):
-        self.web_search = ExaSearchClient()
+    def __init__(self, web_search: SearchClient = ExaSearchClient()):
+        self.web_search = web_search or ExaSearchClient()
         self.skill = Completion(('QLoop', 'Statements'))
 
     def generate_statements(self, main_question: str, current_query: str, history: str, metadata: dict, start_date: str, end_date: str) -> Tuple[List[dict], dict]:

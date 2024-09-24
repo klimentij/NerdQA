@@ -83,12 +83,12 @@ def main():
     chunker = Chunker(chunk_size=config.chunk_size, chunk_overlap=config.chunk_overlap)
 
     # Process the first max_papers_to_process papers from the list
-    for paper in seed_papers[:config.max_papers_to_process]:
+    for i, paper in enumerate(seed_papers[:config.max_papers_to_process]):
         # Create common metadata for the entire pipeline
         pipeline_start_ts = int(time.time())
-        trace_name = f"Paper Compress BM for {paper['meta']['title']}"
-        trace_id = f"T{pipeline_start_ts}"
-        session_id = f"S{pipeline_start_ts}"
+        trace_name = f"BM GenQA for {paper['meta']['title']}"
+        trace_id = f"T{pipeline_start_ts}" + f"_{i+1}"
+        session_id = f"S{pipeline_start_ts}" + f"_{i+1}"
 
         # Use the pre-parsed text from the JSON file
         paper_text = paper['text']

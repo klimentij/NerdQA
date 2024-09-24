@@ -21,9 +21,13 @@ os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 
 from src.qloop.pipeline import StatementGenerator, QueryGenerator, AnswerGenerator
+from src.tools.search_client import SearchClient
+from src.tools.brave_search_client import BraveSearchClient
+from src.tools.exa_search_client import ExaSearchClient
+from src.tools.openalex_search_client import OpenAlexSearchClient
 from src.util.setup_logging import setup_logging
 
-logger = setup_logging(__file__)
+logger = setup_logging(__file__, "DEBUG")
 
 app = FastAPI()
 
@@ -108,6 +112,12 @@ class PipelineOrchestrator:
 
 orchestrator = PipelineOrchestrator()
 
+search_client_map = {
+    "brave": BraveSearchClient,
+    "exa": ExaSearchClient,
+    "openalex": OpenAlexSearchClient
+}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -121,6 +131,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 num_queries = data.get("num_queries", 1)
                 start_date = data.get("start_date", "2000-01-20")
                 end_date = data.get("end_date", time.strftime("%Y-%m-%d"))
+                search_client_name = data.get("search_client", None)
 
                 if not main_question:
                     await websocket.send_json({"error": "No question provided"})
@@ -129,7 +140,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 orchestrator.reset_ids()
                 orchestrator.user_feedback = []
                 orchestrator.current_history = ""
-                await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date)
+
+                search_client = None
+                if search_client_name and search_client_name in search_client_map:
+                    search_client = search_client_map[search_client_name]()
+
+                await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date, search_client)
             elif "feedback" in data:
                 feedback = data["feedback"]
                 logger.info(f"Feedback received: {feedback}")
@@ -140,7 +156,9 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
 
-async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str):
+async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
+    web_search = web_search or ExaSearchClient()
+    orchestrator.statement_generator = StatementGenerator(web_search=web_search)
     orchestrator.main_question = main_question
     all_statements = {}
     all_evidence = {}

@@ -109,3 +109,29 @@ class ExaSearchClient(SearchClient):
             filtered_results.append(self._format_text_as_json(main_text, meta=meta))
 
         return filtered_results
+    
+
+def main():
+    # Example usage of ExaSearchClient
+    client = ExaSearchClient(rerank=True, caching=False, 
+                             reranking_threshold=0.2, 
+                             initial_top_to_retrieve=20,
+                             chunk_size=1024)
+    
+    query = "Latest advancements in artificial intelligence"
+    start_date = "2023-01-01"
+    end_date = "2023-12-31"
+    
+    results = client.search(query, start_published_date=start_date, end_published_date=end_date)
+    
+    print(f"Search Results for: {query}")
+    for i, result in enumerate(results, 1):
+        print(f"\nResult {i}:")
+        print(f"Title: {result['meta']['title']}")
+        print(f"URL: {result['meta']['url']}")
+        print(f"Author: {result['meta']['author']}")
+        print(f"Published Date: {result['meta']['published_date']}")
+        print(f"Text: {result['text'][:200]}...")  # Print first 200 characters of the text
+
+if __name__ == "__main__":
+    main()

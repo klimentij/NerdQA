@@ -760,19 +760,46 @@ class OpenAlexSearchClient(SearchClient):
         return self._chunk_text(text, meta, tokens)
 
 #%%         
-# OpenAlex example usage
-openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
-                                       reranking_threshold=0.2, 
-                                       initial_top_to_retrieve=20,
-                                       chunk_size=1024,
-                                       max_concurrent_downloads=20)  # Set the number of concurrent downloads
+# # OpenAlex example usage
+# openalex_search = OpenAlexSearchClient(rerank=True, caching=False, 
+#                                        reranking_threshold=0.2, 
+#                                        initial_top_to_retrieve=20,
+#                                        chunk_size=1024,
+#                                        max_concurrent_downloads=20)  # Set the number of concurrent downloads
 
-async def main():
-    openalex_results_cited = await openalex_search.search(
-        # "What are the ways to disrupt healthcare in the next 10 years?", 
-        "How can natural language rationales improve reasoning in language models?",
-        start_published_date="2022-01-01", end_published_date="2022-01-01")
+# async def main():
+#     openalex_results_cited = await openalex_search.search(
+#         # "What are the ways to disrupt healthcare in the next 10 years?", 
+#         "How can natural language rationales improve reasoning in language models?",
+#         start_published_date="2022-01-01", end_published_date="2022-01-01")
 
+
+# if __name__ == "__main__":
+#     asyncio.run(main())
+
+# Exa example usage
+exa_search = ExaSearchClient(rerank=True, caching=False, 
+                             reranking_threshold=0.2, 
+                             initial_top_to_retrieve=20,
+                             chunk_size=1024)
+
+def main():
+    exa_results = exa_search.search(
+        "What are the latest advancements in quantum computing?",
+        start_published_date="2023-01-01", 
+        end_published_date="2023-12-31",
+        type="neural",
+        use_autoprompt=True
+    )
+    
+    print(f"Total results: {len(exa_results['results'])}")
+    for i, result in enumerate(exa_results['results'][:5], 1):
+        print(f"\nResult {i}:")
+        print(f"Title: {result['meta'].get('title', 'N/A')}")
+        print(f"URL: {result['meta'].get('url', 'N/A')}")
+        print(f"Published Date: {result['meta'].get('published_date', 'N/A')}")
+        print(f"Reranker Score: {result['meta'].get('reranker_score', 'N/A')}")
+        print(f"Text snippet: {result['text'][:200]}...")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
