@@ -1,22 +1,16 @@
-import os
-import re
-import sys
-import time
 import json
+import time
+import re
 from typing import Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-# Set up paths
-os.chdir(__file__.split('src/')[0])
-sys.path.append(os.getcwd())
-
-from src.llm.completion import Completion
-from src.util.setup_logging import setup_logging
-from src.util.chunking_util import Chunker
+from backend.src.llm.completion import Completion
+from backend.src.util.setup_logging import setup_logging
+from backend.src.util.chunking_util import Chunker
+from backend.src.benchmark.config import BenchmarkConfig
 
 logger = setup_logging(__file__)
 
-# Pydantic models (unchanged)
 class ReportGenerationOutput(BaseModel):
     reflection: str
     report: str
@@ -24,13 +18,6 @@ class ReportGenerationOutput(BaseModel):
 class QuestionGenerationOutput(BaseModel):
     reflection: str
     question: str
-
-class Config(BaseModel):
-    max_papers_to_process: int = 5
-    chunk_size: int = 256
-    chunk_overlap: int = 0
-
-config = Config()
 
 def create_metadata(trace_name: str, trace_id: str, session_id: str) -> Dict[str, str]:
     return {
@@ -46,7 +33,9 @@ def generate_report(formatted_snippets: str, metadata: Dict[str, str]) -> Report
     
     result = skill.complete(
         prompt_inputs={"PAPER": formatted_snippets},
-        completion_kwargs={"metadata": metadata}
+        completion_kwargs={
+            "metadata": metadata,
+        }
     )
     
     try:
@@ -63,7 +52,9 @@ def generate_question(report: str, metadata: Dict[str, str]) -> QuestionGenerati
     
     result = skill.complete(
         prompt_inputs={"REPORT": report},
-        completion_kwargs={"metadata": metadata}
+        completion_kwargs={
+            "metadata": metadata,
+        }
     )
     
     try:
@@ -74,27 +65,17 @@ def generate_question(report: str, metadata: Dict[str, str]) -> QuestionGenerati
     
     return QuestionGenerationOutput(**content_dict)
 
-def main():
-    # Load the seed papers JSON file
-    input_file = os.path.join(os.path.dirname(__file__), "data", "seed_papers.json")
-    with open(input_file, 'r') as f:
-        seed_papers = json.load(f)
-
-    # Initialize the Chunker with chunk size and overlap from config
+def generate_qa_pairs(seed_papers: List[Dict[str, Any]], config) -> List[Dict[str, Any]]:
     chunker = Chunker(chunk_size=config.chunk_size, chunk_overlap=config.chunk_overlap)
 
-    # Process the first max_papers_to_process papers from the list
+    processed_papers = []
     for i, paper in enumerate(seed_papers[:config.max_papers_to_process]):
-        # Create common metadata for the entire pipeline
         pipeline_start_ts = int(time.time())
         trace_name = f"BM GenQA for {paper['meta']['title']}"
-        trace_id = f"T{pipeline_start_ts}" + f"_{i+1}"
-        session_id = f"S{pipeline_start_ts}" + f"_{i+1}"
+        trace_id = f"T{pipeline_start_ts}_{i+1}"
+        session_id = f"S{pipeline_start_ts}_{i+1}"
 
-        # Use the pre-parsed text from the JSON file
         paper_text = paper['text']
-
-        # Use the chunker to produce snippets
         chunks = chunker.chunk_text(paper_text, {})
         snippets = {f"s{i+1}": chunk['text'] for i, chunk in enumerate(chunks)}
         
@@ -102,44 +83,21 @@ def main():
         paper_with_snippets_no_text['formatted_snippets'] = json.dumps(snippets)
         paper['snippets'] = snippets
 
-        # Generate report using the Report skill
         metadata = create_metadata(trace_name, trace_id, session_id)
         report_result = generate_report(json.dumps(paper_with_snippets_no_text), metadata)
-
-        # Generate question based on the report
         question_result = generate_question(report_result.report, metadata)
 
-        # Add generated report and question to the paper data
         paper['question_generated'] = question_result.question
         paper['golden_answer_generated'] = report_result.report
 
-        # Add only the used snippets as references
-        # Updated regex to find the used snippets in the report using special brackets
-        used_snippet_ids = re.findall(r'【s(\d+)】', report_result.report)
-        
-        # Convert snippet IDs to integers and sort them
-        used_snippet_ids = sorted(set(map(int, used_snippet_ids)))
-        
-        # Create a list of used snippets with surrounding context
+        used_snippet_ids = set(map(int, re.findall(r'【s(\d+)】', report_result.report)))
         max_snippet_id = len(snippets)
         used_snippets_with_context = set()
         for snippet_id in used_snippet_ids:
             for context_id in range(max(1, snippet_id - 1), min(max_snippet_id, snippet_id + 2)):
                 used_snippets_with_context.add(context_id)
         
-        # Sort the final list of snippet IDs
-        used_snippets_with_context = sorted(used_snippets_with_context)
-        
-        # Add the used snippets (with context) to the paper data
-        paper['used_snippets_with_context'] = {f"s{i}": snippets[f"s{i}"] for i in used_snippets_with_context}
+        paper['used_snippets_with_context'] = {f"s{i}": snippets[f"s{i}"] for i in sorted(used_snippets_with_context)}
+        processed_papers.append(paper)
 
-    # Save the updated paper data to a new JSON file
-    output_file = os.path.join(os.path.dirname(__file__), "data", "seed_papers_with_qa.json")
-    with open(output_file, 'w') as f:
-        json.dump(seed_papers[:config.max_papers_to_process], f, indent=2)
-
-    logger.info("Generated report and question for the first two papers")
-    logger.info(f"Results saved to: {output_file}")
-
-if __name__ == "__main__":
-    main()
+    return processed_papers

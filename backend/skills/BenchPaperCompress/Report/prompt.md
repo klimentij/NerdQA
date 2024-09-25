@@ -47,5 +47,3 @@ This task involves compressing a scientific paper into a concise report that foc
 - Ensure future reviewers can understand the report without the original paper
 - Allow verification of the report's correctness through inline references
 - Never add any clues or references to the original paper, use must use it only for grounding your reasoning (the paper will get all the credit later anyway through the inline references)
-
-Note: All instructions are crucial and must be followed carefully.

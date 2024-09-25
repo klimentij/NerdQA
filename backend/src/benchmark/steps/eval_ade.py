@@ -1,17 +1,13 @@
 import asyncio
 import websockets
 import json
-import os
-import sys
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 
-os.chdir(__file__.split('src/')[0])
-sys.path.append(os.getcwd())
-
-from src.util.setup_logging import setup_logging
-from src.llm.completion import Completion
+from backend.src.util.setup_logging import setup_logging
+from backend.src.llm.completion import Completion
+from backend.src.benchmark.config import BenchmarkConfig, EvaluationConfig
 
 logger = setup_logging(__file__, log_level="DEBUG")
 
@@ -34,10 +30,10 @@ class EvaluationScores(BaseModel):
 class EvaluationResponse(BaseModel):
     scores: EvaluationScores
 
-async def connect_and_send(data, max_retries=3, retry_delay=5):
+async def connect_and_send(data: Dict[str, Any], config: EvaluationConfig) -> Tuple[Any, Any]:
     uri = "ws://localhost:8000/ws"
     retries = 0
-    while retries < max_retries:
+    while retries < config.max_retries:
         try:
             async with websockets.connect(uri, ping_interval=None) as websocket:
                 input_data = {
@@ -51,27 +47,23 @@ async def connect_and_send(data, max_retries=3, retry_delay=5):
                 await websocket.send(json.dumps(input_data))
                 logger.info(f"Sent: {input_data}")
 
-                final_answer = None
-                citation_tree = None
                 try:
-                    async with asyncio.timeout(1200):  # 20 minutes timeout
+                    async with asyncio.timeout(config.timeout):
                         while True:
                             response = await websocket.recv()
                             logger.info(f"Received: {str(response)[:1000]}")
                             response_data = json.loads(response)
                             if response_data.get("type") == "answer":
-                                final_answer = response_data["data"]
-                                citation_tree = response_data.get("full_citation_tree", {})
-                                return final_answer, citation_tree
+                                return response_data["data"], response_data.get("full_citation_tree", {})
                 except asyncio.TimeoutError:
-                    logger.error("Timeout: No response received within 20 minutes")
+                    logger.error(f"Timeout: No response received within {config.timeout} seconds")
                     return None, None
         except websockets.exceptions.ConnectionClosedError as e:
             logger.error(f"Connection closed unexpectedly: {e}")
             retries += 1
-            if retries < max_retries:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
+            if retries < config.max_retries:
+                logger.info(f"Retrying in {config.retry_delay} seconds...")
+                await asyncio.sleep(config.retry_delay)
             else:
                 logger.error("Max retries reached. Giving up.")
                 return None, None
@@ -81,7 +73,7 @@ async def connect_and_send(data, max_retries=3, retry_delay=5):
 
     return None, None
 
-async def evaluate_answer(paper: Dict[str, Any]) -> Tuple[EvaluationResponse, float]:
+async def evaluate_answer(paper: Dict[str, Any], config: BenchmarkConfig) -> Tuple[EvaluationResponse, float]:
     logger.info("Evaluating answer using the Eval skill")
     skill = Completion(('BenchPaperCompress', 'Eval'))
     
@@ -95,14 +87,15 @@ async def evaluate_answer(paper: Dict[str, Any]) -> Tuple[EvaluationResponse, fl
     
     result = skill.complete(
         prompt_inputs={"INPUT": json.dumps(input_data)},
-        completion_kwargs={"metadata": {}}  # Add appropriate metadata if needed
+        completion_kwargs={
+            "metadata": {}
+        }
     )
     
     try:
         content_dict = json.loads(result.content)
         evaluation_response = EvaluationResponse(**content_dict)
         
-        # Calculate average score
         scores = evaluation_response.scores
         total_score = sum(getattr(scores, field).score for field in scores.__fields__)
         average_score = total_score / len(scores.__fields__)
@@ -112,39 +105,17 @@ async def evaluate_answer(paper: Dict[str, Any]) -> Tuple[EvaluationResponse, fl
         logger.error(f"Failed to parse result content: {result.content}")
         raise ValueError("Invalid response format from Eval skill")
 
-async def main():
-    # Load seed papers
-    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
-    with open(os.path.join(data_dir, 'seed_papers_with_qa.json'), 'r') as f:
-        seed_papers = json.load(f)
-
-    # Take up to 2 records
-    selected_papers = seed_papers[:2]
-
-    # Process papers in parallel
-    tasks = [connect_and_send(paper) for paper in selected_papers]
+async def evaluate_answers(papers_with_qa: List[Dict[str, Any]], config: BenchmarkConfig) -> List[Dict[str, Any]]:
+    tasks = [connect_and_send(paper, config.evaluation) for paper in papers_with_qa]
     results = await asyncio.gather(*tasks)
 
-    # Add server answers and references to the dictionaries
-    for paper, result in zip(selected_papers, results):
+    for paper, result in zip(papers_with_qa, results):
         answer, citation_tree = result
         paper['eval_answer'] = answer
         paper['eval_references'] = citation_tree
 
-        # Evaluate the answer
-        evaluation, average_score = await evaluate_answer(paper)
+        evaluation, average_score = await evaluate_answer(paper, config)
         paper['evaluation'] = evaluation.dict()
         paper['average_score'] = average_score
 
-    # Save results
-    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    output_file = os.path.join(output_dir, f'{os.path.basename(__file__)}.json')
-    with open(output_file, 'w') as f:
-        json.dump(selected_papers, f, indent=2)
-
-    logger.info(f"Results saved to {output_file}")
-
-# Run the client
-asyncio.get_event_loop().run_until_complete(main())
+    return papers_with_qa

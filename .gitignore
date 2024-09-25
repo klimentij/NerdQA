@@ -179,3 +179,5 @@ logs/
 # Cache folder
 cache/
 
+# benchmark
+backend/wandb
