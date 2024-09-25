@@ -26,7 +26,7 @@ class QuestionGenerationOutput(BaseModel):
     question: str
 
 class Config(BaseModel):
-    max_papers_to_process: int = 2
+    max_papers_to_process: int = 5
     chunk_size: int = 256
     chunk_overlap: int = 0
 
