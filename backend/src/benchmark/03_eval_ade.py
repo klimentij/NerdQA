@@ -4,13 +4,35 @@ import json
 import os
 import sys
 from datetime import datetime, timedelta
+from pydantic import BaseModel, Field
+from typing import Dict, Any
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
 
-# Set up logger
 from src.util.setup_logging import setup_logging
+from src.llm.completion import Completion
+
 logger = setup_logging(__file__, log_level="DEBUG")
+
+class ScoreDetail(BaseModel):
+    reasoning: str
+    score: int = Field(..., ge=1, le=10)
+
+class EvaluationScores(BaseModel):
+    accuracy: ScoreDetail
+    completeness: ScoreDetail
+    relevance: ScoreDetail
+    evidence_quality: ScoreDetail
+    clarity: ScoreDetail
+    logical_structure: ScoreDetail
+    evidence_support: ScoreDetail
+    depth_of_analysis: ScoreDetail
+    objectivity: ScoreDetail
+    synthesis: ScoreDetail
+
+class EvaluationResponse(BaseModel):
+    scores: EvaluationScores
 
 async def connect_and_send(data, max_retries=3, retry_delay=5):
     uri = "ws://localhost:8000/ws"
@@ -59,6 +81,30 @@ async def connect_and_send(data, max_retries=3, retry_delay=5):
 
     return None, None
 
+async def evaluate_answer(paper: Dict[str, Any]) -> EvaluationResponse:
+    logger.info("Evaluating answer using the Eval skill")
+    skill = Completion(('BenchPaperCompress', 'Eval'))
+    
+    input_data = {
+        "question_generated": paper["question_generated"],
+        "golden_answer_generated": paper["golden_answer_generated"],
+        "used_snippets_with_context": paper["used_snippets_with_context"],
+        "eval_answer": paper["eval_answer"],
+        "eval_references": paper["eval_references"]
+    }
+    
+    result = skill.complete(
+        prompt_inputs={"INPUT": json.dumps(input_data)},
+        completion_kwargs={"metadata": {}}  # Add appropriate metadata if needed
+    )
+    
+    try:
+        content_dict = json.loads(result.content)
+        return EvaluationResponse(**content_dict)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse result content: {result.content}")
+        raise ValueError("Invalid response format from Eval skill")
+
 async def main():
     # Load seed papers
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
@@ -77,6 +123,10 @@ async def main():
         answer, citation_tree = result
         paper['eval_answer'] = answer
         paper['eval_references'] = citation_tree
+
+        # Evaluate the answer
+        evaluation = await evaluate_answer(paper)
+        paper['evaluation'] = evaluation.dict()
 
     # Save results
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')

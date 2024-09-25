@@ -5,80 +5,186 @@
     "schema": {
       "type": "object",
       "properties": {
-        "reflection": {
-          "type": "string",
-          "description": "A high-level reflection on the evaluation task (approximately 300 words), summarizing the nature and complexity of the question, outlining key strengths and potential areas for improvement in the given answer, and briefly describing the approach to ensuring a fair and thorough evaluation."
-        },
         "scores": {
           "type": "object",
           "properties": {
-            "Accuracy": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for factual correctness compared to the golden answer"
+            "accuracy": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the accuracy score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for factual correctness compared to the golden answer"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Completeness": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for thoroughness in covering all aspects addressed in the golden answer"
+            "completeness": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the completeness score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for thoroughness in covering all aspects addressed in the golden answer"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Relevance": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for addressing specific points of the complex question"
+            "relevance": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the relevance score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for addressing specific points of the complex question"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Evidence Quality": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for reliability and authority of cited sources"
+            "evidence_quality": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the evidence quality score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for reliability and authority of cited sources"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Clarity": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for clarity and ease of understanding"
+            "clarity": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the clarity score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for clarity and ease of understanding"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Logical Structure": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for organization and logical presentation"
+            "logical_structure": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the logical structure score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for organization and logical presentation"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Evidence Support": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for use of evidence to support claims"
+            "evidence_support": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the evidence support score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for use of evidence to support claims"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Depth of Analysis": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for in-depth analysis provided"
+            "depth_of_analysis": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the depth of analysis score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for in-depth analysis provided"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Objectivity": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for balanced and unbiased perspective"
+            "objectivity": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the objectivity score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for balanced and unbiased perspective"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             },
-            "Synthesis": {
-              "type": "integer",
-              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-              "description": "Score for integration of information from multiple sources or viewpoints"
+            "synthesis": {
+              "type": "object",
+              "properties": {
+                "reasoning": {
+                  "type": "string",
+                  "description": "Step-by-step reasoning for the synthesis score"
+                },
+                "score": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                  "description": "Score for integration of information from multiple sources or viewpoints"
+                }
+              },
+              "required": ["reasoning", "score"],
+              "additionalProperties": false
             }
           },
           "required": [
-            "Accuracy",
-            "Completeness",
-            "Relevance",
-            "Evidence Quality",
-            "Clarity",
-            "Logical Structure",
-            "Evidence Support",
-            "Depth of Analysis",
-            "Objectivity",
-            "Synthesis"
+            "accuracy",
+            "completeness",
+            "relevance",
+            "evidence_quality",
+            "clarity",
+            "logical_structure",
+            "evidence_support",
+            "depth_of_analysis",
+            "objectivity",
+            "synthesis"
           ],
           "additionalProperties": false
         }
       },
-      "required": ["reflection", "scores"],
+      "required": ["scores"],
       "additionalProperties": false
     },
     "strict": true

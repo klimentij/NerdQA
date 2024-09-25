@@ -53,13 +53,6 @@ Your task is to conduct a comprehensive evaluation of the given answer against t
 
 ## Response Format
 
-### Part 1: Initial Assessment (approx. 300 words)
-Provide a high-level reflection on the evaluation task:
-- Summarize the nature and complexity of the question
-- Outline the key strengths and potential areas for improvement in the given answer
-- Briefly describe your approach to ensuring a fair and thorough evaluation
-
-### Part 2: Detailed Evaluation
 For each of the 10 criteria:
 
 Criterion Name: [Name]
