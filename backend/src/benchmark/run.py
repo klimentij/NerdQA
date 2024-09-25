@@ -1,4 +1,4 @@
-# benchmark/run.py
+# python -m backend.src.benchmark.run
 import asyncio
 import os
 import json
