@@ -206,6 +206,7 @@ class Completion:
         self.tokenizer = VdTokenizer(scfg['completion_kwargs']['model'])
         self.prompt_len = len(self.tokenizer.encode(str(self.prompt)))
         self.trim_label = "[trimmed]"
+        self.caching = self.skill_config.get("caching", True)
 
         
         # If trimming is not overriden, use the skill config

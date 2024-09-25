@@ -5,7 +5,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -81,7 +81,7 @@ async def connect_and_send(data, max_retries=3, retry_delay=5):
 
     return None, None
 
-async def evaluate_answer(paper: Dict[str, Any]) -> EvaluationResponse:
+async def evaluate_answer(paper: Dict[str, Any]) -> Tuple[EvaluationResponse, float]:
     logger.info("Evaluating answer using the Eval skill")
     skill = Completion(('BenchPaperCompress', 'Eval'))
     
@@ -100,7 +100,14 @@ async def evaluate_answer(paper: Dict[str, Any]) -> EvaluationResponse:
     
     try:
         content_dict = json.loads(result.content)
-        return EvaluationResponse(**content_dict)
+        evaluation_response = EvaluationResponse(**content_dict)
+        
+        # Calculate average score
+        scores = evaluation_response.scores
+        total_score = sum(getattr(scores, field).score for field in scores.__fields__)
+        average_score = total_score / len(scores.__fields__)
+        
+        return evaluation_response, average_score
     except json.JSONDecodeError:
         logger.error(f"Failed to parse result content: {result.content}")
         raise ValueError("Invalid response format from Eval skill")
@@ -125,8 +132,9 @@ async def main():
         paper['eval_references'] = citation_tree
 
         # Evaluate the answer
-        evaluation = await evaluate_answer(paper)
+        evaluation, average_score = await evaluate_answer(paper)
         paper['evaluation'] = evaluation.dict()
+        paper['average_score'] = average_score
 
     # Save results
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')

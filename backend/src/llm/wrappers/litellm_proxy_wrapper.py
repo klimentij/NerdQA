@@ -17,7 +17,7 @@ import openai
 class LiteLLMProxyWrapper:
     def __init__(
             self,
-            caching: bool = False,
+            caching: bool = True,
             stream: bool = False,
             interface: Literal['rest', 'openai'] = 'rest'):
         self.headers = {"Authorization": f"Bearer {litellm_cfg['general_settings']['master_key']}", "Content-Type": "application/json"}
@@ -58,38 +58,6 @@ class LiteLLMProxyWrapper:
             **kwargs
         }
 
-        try:
-            if self.caching:  # Check if response is in cache
-                cached_response = self.cache.get(payload)
-                if cached_response is not None:
-                    logger.debug(f"Response found in cache, returning cached response")
-                    if isinstance(cached_response, str):
-                        # If cached_response is a string, assume it's JSON and parse it
-                        try:
-                            cached_response = json.loads(cached_response)
-                        except json.JSONDecodeError:
-                            logger.warning("Failed to parse cached response as JSON")
-                            # If parsing fails, fall through to making a new API request
-                        else:
-                            return {
-                                **cached_response,
-                                'from_cache': True
-                            }
-                    elif isinstance(cached_response, dict):
-                        return {
-                            **cached_response,
-                            'from_cache': True
-                        }
-                    else:
-                        logger.warning(f"Unexpected cached response type: {type(cached_response)}")
-                        # Fall through to making a new API request
-                else:
-                    logger.debug(f"Response not found in cache, making API request")
-
-        except Exception:
-            logger.exception("Failed caching")
-
-
         start_time = time.time()  # Start time of the single request
         response = self._complete(
             model=model,
@@ -115,12 +83,6 @@ class LiteLLMProxyWrapper:
             if result.get('choices', [{}])[0].get('message', {}).get('role') == 'assistant':
                 if result['choices'][0]['message'].get('content'):
                     result['choices'][0]['message']['content'] = prefill + result['choices'][0]['message']['content']
-
-        if self.caching:
-            logger.info("Caching response")
-            # thread = Thread(target=self._update_cache, args=(payload, result), kwargs={'latency': latency})
-            # thread.start()
-            self._update_cache(payload, result, latency=latency)
 
         return result
         
@@ -156,6 +118,9 @@ class LiteLLMProxyWrapper:
                 }
             }
             data.update(kwargs)
+
+            if not self.caching:
+                data['cache'] = {"no-cache": True}
 
             logger.debug(f"Making API request to {url}. \n\nData: {json.dumps(data, indent=2)}")
             result = requests.post(url, headers=headers, json=data)
