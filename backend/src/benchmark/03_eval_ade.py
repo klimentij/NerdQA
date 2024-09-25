@@ -66,7 +66,7 @@ async def main():
         seed_papers = json.load(f)
 
     # Take up to 2 records
-    selected_papers = seed_papers[:5]
+    selected_papers = seed_papers[:1]
 
     # Process papers in parallel
     tasks = [connect_and_send(paper) for paper in selected_papers]

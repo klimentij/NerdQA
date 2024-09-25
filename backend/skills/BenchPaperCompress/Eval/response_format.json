@@ -1,0 +1,86 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "evaluation_response",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A high-level reflection on the evaluation task (approximately 300 words), summarizing the nature and complexity of the question, outlining key strengths and potential areas for improvement in the given answer, and briefly describing the approach to ensuring a fair and thorough evaluation."
+        },
+        "scores": {
+          "type": "object",
+          "properties": {
+            "Accuracy": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for factual correctness compared to the golden answer"
+            },
+            "Completeness": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for thoroughness in covering all aspects addressed in the golden answer"
+            },
+            "Relevance": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for addressing specific points of the complex question"
+            },
+            "Evidence Quality": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for reliability and authority of cited sources"
+            },
+            "Clarity": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for clarity and ease of understanding"
+            },
+            "Logical Structure": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for organization and logical presentation"
+            },
+            "Evidence Support": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for use of evidence to support claims"
+            },
+            "Depth of Analysis": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for in-depth analysis provided"
+            },
+            "Objectivity": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for balanced and unbiased perspective"
+            },
+            "Synthesis": {
+              "type": "integer",
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              "description": "Score for integration of information from multiple sources or viewpoints"
+            }
+          },
+          "required": [
+            "Accuracy",
+            "Completeness",
+            "Relevance",
+            "Evidence Quality",
+            "Clarity",
+            "Logical Structure",
+            "Evidence Support",
+            "Depth of Analysis",
+            "Objectivity",
+            "Synthesis"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["reflection", "scores"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

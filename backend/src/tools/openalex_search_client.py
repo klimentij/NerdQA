@@ -17,7 +17,7 @@ from src.db.local_cache import LocalCache
 
 # Set up logger
 from src.util.setup_logging import setup_logging
-logger = setup_logging(__file__, log_level="DEBUG")
+logger = setup_logging(__file__, log_level="INFO")
 
 from src.util.setup_logging import setup_logging
 from src.tools.search_client import SearchClient, get_common_headers
@@ -146,7 +146,13 @@ class OpenAlexSearchClient(SearchClient):
 
         logger.debug(f"Reranked results: {json.dumps(reranked_results, indent=2)}")
 
-        return {"results": reranked_results, "total_count": total_count}
+        result = {"results": reranked_results, "total_count": total_count}
+
+        # Cache the result if caching is enabled
+        if self.cache:
+            self.cache.set(cache_key, result)
+
+        return result
 
     def _extract_prioritized_pdf_links(self, result):
         pdf_links = []

@@ -121,8 +121,6 @@ class PipelineOrchestrator:
         )
         return answer
 
-orchestrator = PipelineOrchestrator()
-
 search_client_map = {
     "brave": BraveSearchClient,
     "exa": ExaSearchClient,
@@ -140,7 +138,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 main_question = data["question"]
                 iterations = data.get("iterations", 1)
                 num_queries = data.get("num_queries", 1)
-                start_date = data.get("start_date", "2000-01-20")
+                start_date = data.get("start_date", "1900-01-20")
                 end_date = data.get("end_date", time.strftime("%Y-%m-%d"))
                 search_client_name = data.get("search_client", None)
 
@@ -148,27 +146,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"error": "No question provided"})
                     continue
 
-                orchestrator.reset_ids()
-                orchestrator.user_feedback = []
-                orchestrator.current_history = ""
-
                 search_client = None
                 if search_client_name and search_client_name in search_client_map:
                     search_client = search_client_map[search_client_name]()
 
                 await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date, search_client)
-            elif "feedback" in data:
-                feedback = data["feedback"]
-                logger.info(f"Feedback received: {feedback}")
-                orchestrator.add_user_feedback(feedback)
-                logger.info(f"Current history after adding feedback: {orchestrator.current_history}")
-                await websocket.send_json({"type": "feedback_received", "message": "Feedback received and incorporated into the current history."})
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
 
 async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
     web_search = web_search or ExaSearchClient()
+    orchestrator = PipelineOrchestrator()
     orchestrator.statement_generator = StatementGenerator(web_search=web_search)
     orchestrator.main_question = main_question
     all_statements = {}
