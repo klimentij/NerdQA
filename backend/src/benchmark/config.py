@@ -19,11 +19,12 @@ class QAGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     chunk_size: int = 256
     chunk_overlap: int = 0
-    
+
 class EvaluationConfig(BaseModel):
-    max_retries: int = 3
-    retry_delay: int = 5
-    timeout: int = 1200
+    eval_llm: str = "gpt-4o-mini"
+    iterations: int = 1
+    num_queries: int = 1
+    search_client: str = "openalex"
 
 class BenchmarkConfig(BaseModel):
     project_name: str = "ADE"

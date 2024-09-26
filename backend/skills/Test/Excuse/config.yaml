@@ -1,8 +1,0 @@
-caching: true
-
-completion_kwargs:
-  model: llama3-70b-8192
-  temperature: 1.0
-  max_tokens: 10
-
-  

@@ -1,4 +1,4 @@
-caching: true
+caching: false
 
 completion_kwargs:
   # model: gpt-4o-mini
