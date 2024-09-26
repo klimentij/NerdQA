@@ -22,8 +22,8 @@ class QAGenerationConfig(BaseModel):
 
 class EvaluationConfig(BaseModel):
     eval_llm: str = "gpt-4o-mini"
-    iterations: int = 1
-    num_queries: int = 1
+    iterations: int = 5
+    num_queries: int = 5
     search_client: str = "openalex"
 
 class BenchmarkConfig(BaseModel):

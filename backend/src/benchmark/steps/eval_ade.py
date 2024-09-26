@@ -1,5 +1,5 @@
 import asyncio
-import websockets
+import aiohttp
 import json
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
@@ -31,39 +31,33 @@ class EvaluationScores(BaseModel):
 class EvaluationResponse(BaseModel):
     scores: EvaluationScores
 
-async def connect_and_send(data: Dict[str, Any], config: EvaluationConfig) -> Tuple[Any, Any]:
-    uri = "ws://localhost:8000/ws"
+async def run_pipeline_request(data: Dict[str, Any], config: EvaluationConfig) -> Tuple[Any, Any]:
+    url = "http://localhost:8000/run_pipeline"
     retries = 0
     max_retries = 3
     retry_delay = 5
     timeout = 1200
+
+    params = {
+        "question": data["question_generated"],
+        "iterations": config.iterations,
+        "num_queries": config.num_queries,
+        "end_date": (datetime.strptime(data["meta"]["publication_date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"),
+        "search_client": config.search_client
+    }
+
     while retries < max_retries:
         try:
-            async with websockets.connect(uri, ping_interval=None) as websocket:
-                input_data = {
-                    "question": data["question_generated"],
-                    "iterations": config.iterations,
-                    "num_queries": config.num_queries,
-                    "end_date": (datetime.strptime(data["meta"]["publication_date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"),
-                    "search_client": config.search_client
-                }
-
-                await websocket.send(json.dumps(input_data))
-                logger.info(f"Sent: {input_data}")
-
-                try:
-                    async with asyncio.timeout(timeout):
-                        while True:
-                            response = await websocket.recv()
-                            logger.info(f"Received: {str(response)[:1000]}")
-                            response_data = json.loads(response)
-                            if response_data.get("type") == "answer":
-                                return response_data["data"], response_data.get("full_citation_tree", {})
-                except asyncio.TimeoutError:
-                    logger.error(f"Timeout: No response received within {timeout} seconds")
-                    return None, None
-        except websockets.exceptions.ConnectionClosedError as e:
-            logger.error(f"Connection closed unexpectedly: {e}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=timeout) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result["answer"], result["full_citation_tree"]
+                    else:
+                        logger.error(f"Error response: {response.status}")
+                        return None, None
+        except aiohttp.ClientError as e:
+            logger.error(f"Request error: {e}")
             retries += 1
             if retries < max_retries:
                 logger.info(f"Retrying in {retry_delay} seconds...")
@@ -71,6 +65,9 @@ async def connect_and_send(data: Dict[str, Any], config: EvaluationConfig) -> Tu
             else:
                 logger.error("Max retries reached. Giving up.")
                 return None, None
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout: No response received within {timeout} seconds")
+            return None, None
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None, None
@@ -118,7 +115,7 @@ async def evaluate_answers(papers_with_qa: List[Dict[str, Any]], config: Benchma
     metadata = create_metadata(trace_name, trace_id, session_id)
 
     async def process_paper(paper):
-        answer, citation_tree = await connect_and_send(paper, config.evaluation)
+        answer, citation_tree = await run_pipeline_request(paper, config.evaluation)
         paper['eval_answer'] = answer
         paper['eval_references'] = citation_tree
         evaluation, average_score = await evaluate_answer(paper, config, metadata)

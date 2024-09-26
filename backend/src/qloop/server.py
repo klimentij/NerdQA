@@ -11,13 +11,14 @@ import os
 import random
 import sys
 from typing import List
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
 import re
 from inspect import iscoroutinefunction
 import hashlib
+from fastapi.responses import JSONResponse
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -154,6 +155,61 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
+
+class MockWebSocket:
+    def __init__(self):
+        self.messages = []
+
+    async def send_json(self, message):
+        self.messages.append(message)
+
+@app.get("/run_pipeline")
+async def run_pipeline_endpoint(
+    question: str,
+    iterations: int = 1,
+    num_queries: int = 1,
+    start_date: str = "1900-01-20",
+    end_date: str = None,
+    search_client: str = None
+):
+    if not question:
+        raise HTTPException(status_code=400, detail="No question provided")
+
+    if end_date is None:
+        end_date = time.strftime("%Y-%m-%d")
+
+    search_client_instance = None
+    if search_client and search_client in search_client_map:
+        search_client_instance = search_client_map[search_client]()
+
+    mock_websocket = MockWebSocket()
+    
+    await run_pipeline(
+        mock_websocket,
+        question,
+        iterations,
+        num_queries,
+        start_date,
+        end_date,
+        search_client_instance
+    )
+
+    # Process the collected messages to create the final response
+    final_answer = ""
+    full_citation_tree = {}
+    summary = {}
+
+    for message in mock_websocket.messages:
+        if message["type"] == "answer":
+            final_answer = message["data"]
+            full_citation_tree = message["full_citation_tree"]
+            summary = message["summary"]
+
+    return JSONResponse({
+        "answer": final_answer,
+        "summary": summary,
+        "full_citation_tree": full_citation_tree
+    })
 
 async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
     web_search = web_search or ExaSearchClient()
