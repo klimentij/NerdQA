@@ -2,9 +2,11 @@ import asyncio
 import pandas as pd
 from backend.src.tools.openalex_search_client import OpenAlexSearchClient
 from backend.src.util.setup_logging import setup_logging
-
+from backend.src.db.local_cache import LocalCache
 logger = setup_logging(__name__)
+cache = LocalCache()
 
+@cache
 async def fetch_and_process_papers(config):
     openalex_search = OpenAlexSearchClient(
         rerank=False,
