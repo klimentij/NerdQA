@@ -133,28 +133,32 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            data = await websocket.receive_json()
-            logger.info(f"Received data: {data}")
-            if "question" in data:
-                main_question = data["question"]
-                iterations = data.get("iterations", 1)
-                num_queries = data.get("num_queries", 1)
-                start_date = data.get("start_date", "1900-01-20")
-                end_date = data.get("end_date", time.strftime("%Y-%m-%d"))
-                search_client_name = data.get("search_client", None)
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=30)  # 30 seconds timeout
+                logger.info(f"Received data: {data}")
+                if "question" in data:
+                    main_question = data["question"]
+                    iterations = data.get("iterations", 1)
+                    num_queries = data.get("num_queries", 1)
+                    start_date = data.get("start_date", "1900-01-20")
+                    end_date = data.get("end_date", time.strftime("%Y-%m-%d"))
+                    search_client_name = data.get("search_client", None)
 
-                if not main_question:
-                    await websocket.send_json({"error": "No question provided"})
-                    continue
+                    if not main_question:
+                        await websocket.send_json({"error": "No question provided"})
+                        continue
 
-                search_client = None
-                if search_client_name and search_client_name in search_client_map:
-                    search_client = search_client_map[search_client_name]()
+                    search_client = None
+                    if search_client_name and search_client_name in search_client_map:
+                        search_client = search_client_map[search_client_name]()
 
-                await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date, search_client)
-
+                    await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date, search_client)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "ping"})
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
 
 class MockWebSocket:
     def __init__(self):

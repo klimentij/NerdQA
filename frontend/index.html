@@ -448,13 +448,16 @@
 
             socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                console.log("Received WebSocket message:", data); // Debugging log
-                handleWebSocketMessage(data);
+                if (data.type === "ping") {
+                    socket.send(JSON.stringify({type: "pong"}));
+                } else {
+                    handleWebSocketMessage(data);
+                }
             };
 
             socket.onclose = function(event) {
                 console.log("WebSocket connection closed");
-                setTimeout(connectWebSocket, 5000);
+                setTimeout(connectWebSocket, 5000);  // Attempt to reconnect after 5 seconds
             };
 
             socket.onerror = function(error) {
