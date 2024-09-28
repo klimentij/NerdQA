@@ -59,7 +59,7 @@ async def process_paper(paper: Dict[str, Any], config: BenchmarkConfig, metadata
 async def run_benchmark(config: BenchmarkConfig):
     """Run the entire benchmark process."""
     # Initialize W&B
-    wandb.init(project=config.project_name, config=config.dict())
+    wandb.init(project=config.project_name, config=config)
 
     # Log Completion skill configurations
     report_skill = Completion(('BenchPaperCompress', 'Report'))
@@ -74,54 +74,54 @@ async def run_benchmark(config: BenchmarkConfig):
     seed_papers = await fetch_and_process_papers(config.seed_papers)
     logger.info(f"Fetched {len(seed_papers)} seed papers")
 
-    # Generate QA pairs
-    papers_with_qa = generate_qa_pairs(seed_papers, config.qa_generation)
-    logger.info(f"Generated QA pairs for {len(papers_with_qa)} papers")
+    # # Generate QA pairs
+    # papers_with_qa = generate_qa_pairs(seed_papers, config.qa_generation)
+    # logger.info(f"Generated QA pairs for {len(papers_with_qa)} papers")
 
-    # Create metadata
-    pipeline_start_ts = int(time.time())
-    trace_name = f"BM EvalADE for {len(papers_with_qa)} papers"
-    trace_id = f"T{pipeline_start_ts}"
-    session_id = f"S{pipeline_start_ts}"
-    metadata = create_metadata(trace_name, trace_id, session_id)
+    # # Create metadata
+    # pipeline_start_ts = int(time.time())
+    # trace_name = f"BM EvalADE for {len(papers_with_qa)} papers"
+    # trace_id = f"T{pipeline_start_ts}"
+    # session_id = f"S{pipeline_start_ts}"
+    # metadata = create_metadata(trace_name, trace_id, session_id)
 
-    # Process each paper
-    tasks = [process_paper(paper, config, metadata) for paper in papers_with_qa]
-    evaluation_results = await asyncio.gather(*tasks)
+    # # Process each paper
+    # tasks = [process_paper(paper, config, metadata) for paper in papers_with_qa]
+    # evaluation_results = await asyncio.gather(*tasks)
 
-    # Log evaluation results
-    for result in evaluation_results:
-        log_data = {
-            "paper_average_score": result['average_score']
-        }
+    # # Log evaluation results
+    # for result in evaluation_results:
+    #     log_data = {
+    #         "paper_average_score": result['average_score']
+    #     }
         
-        # Add individual scores to the log_data dictionary
-        for score_name, score_detail in result['evaluation']['scores'].items():
-            log_data[score_name] = score_detail['score']
+    #     # Add individual scores to the log_data dictionary
+    #     for score_name, score_detail in result['evaluation']['scores'].items():
+    #         log_data[score_name] = score_detail['score']
         
-        # Log all scores in a single call
-        wandb.log(log_data)
+    #     # Log all scores in a single call
+    #     wandb.log(log_data)
 
-    # Calculate and log overall average score
-    overall_average = sum(r['average_score'] for r in evaluation_results) / len(evaluation_results)
-    wandb.log({"overall_average_score": overall_average})
-    logger.info(f"Overall average score: {overall_average}")
+    # # Calculate and log overall average score
+    # overall_average = sum(r['average_score'] for r in evaluation_results) / len(evaluation_results)
+    # wandb.log({"overall_average_score": overall_average})
+    # logger.info(f"Overall average score: {overall_average}")
 
-    # Save results as wandb artifact
-    results_artifact = wandb.Artifact("evaluation_results", type="benchmark_results")
-    with results_artifact.new_file("evaluation_results.json", mode="w") as f:
-        json.dump(evaluation_results, f, indent=2)
-    wandb.log_artifact(results_artifact)
+    # # Save results as wandb artifact
+    # results_artifact = wandb.Artifact("evaluation_results", type="benchmark_results")
+    # with results_artifact.new_file("evaluation_results.json", mode="w") as f:
+    #     json.dump(evaluation_results, f, indent=2)
+    # wandb.log_artifact(results_artifact)
 
-    # Save results to static filename
-    runs_dir = os.path.join(os.path.dirname(__file__), "runs")
-    os.makedirs(runs_dir, exist_ok=True)
-    static_output_file = os.path.join(runs_dir, "last_run.json")
-    with open(static_output_file, 'w') as f:
-        json.dump(evaluation_results, f, indent=2)
+    # # Save results to static filename
+    # runs_dir = os.path.join(os.path.dirname(__file__), "runs")
+    # os.makedirs(runs_dir, exist_ok=True)
+    # static_output_file = os.path.join(runs_dir, "last_run.json")
+    # with open(static_output_file, 'w') as f:
+    #     json.dump(evaluation_results, f, indent=2)
 
-    logger.info(f"Results saved to {static_output_file}")
-    wandb.finish()
+    # logger.info(f"Results saved to {static_output_file}")
+    # wandb.finish()
 
 if __name__ == "__main__":
     config = load_config()

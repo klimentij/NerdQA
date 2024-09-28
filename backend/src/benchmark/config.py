@@ -1,19 +1,21 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import date
 
 class SeedPapersConfig(BaseModel):
-    query: str = "Large language models"
+    query: str = ""
+    title_search: str = "survey"
     sort: str = "cited_by_count:desc"
     start_published_date: date = Field(default_factory=lambda: date(2024, 1, 1))
     end_published_date: date = Field(default_factory=lambda: date(2024, 9, 1))
     caching: bool = True
     use_pdf_cache: bool = True
-    initial_top_to_retrieve: int = 200
+    initial_top_to_retrieve: int = 100
     num_tokens_min: int = 7000
-    num_tokens_max: int = 20000
-    cited_by_count_min: int = 50
-    max_papers_to_seed: int = 50
+    num_tokens_max: int = 500000
+    cited_by_count_min: int = 20
+    max_papers_to_seed: int = 10
+    min_reference_count: int = 200
 
 class QAGenerationConfig(BaseModel):
     max_papers_to_process: int = 5

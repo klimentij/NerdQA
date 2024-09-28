@@ -17,11 +17,10 @@ from src.db.local_cache import LocalCache
 
 # Set up logger
 from src.util.setup_logging import setup_logging
-logger = setup_logging(__file__, log_level="INFO")
+logger = setup_logging(__file__, log_level="DEBUG")
 
-from src.util.setup_logging import setup_logging
 from src.tools.search_client import SearchClient, get_common_headers
-from src.tools.exa_downloader import ExaDownloader
+
 
 class OpenAlexSearchClient(SearchClient):
     def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, 
@@ -40,16 +39,32 @@ class OpenAlexSearchClient(SearchClient):
         }
         self.per_page = min(self.initial_top_to_retrieve, 200)  # Adjust per_page based on initial_top_to_retrieve
 
-    def _get_search_url(self, query: str, sort: str = None, page: int = 1) -> str:
+    def _get_search_url(self, query: str, sort: str = None, page: int = 1, min_reference_count: int = 0, title_search: str = "", start_published_date: str = None, end_published_date: str = None) -> str:
         encoded_query = urllib.parse.quote(query)
         url = f"{self.base_url}?search={encoded_query}"
-        url += f"&select=id,doi,title,relevance_score,publication_date,cited_by_count,topics,keywords,concepts,best_oa_location,abstract_inverted_index,updated_date,created_date,locations"
+        url += f"&select=id,doi,title,relevance_score,publication_date,cited_by_count,topics,keywords,concepts,best_oa_location,abstract_inverted_index,updated_date,created_date,locations,referenced_works"
         
         # Use the provided sort parameter, or default to relevance_score:desc
         sort = sort or self.sort or "relevance_score:desc"
         url += f"&sort={sort}"
         
         url += f"&per-page={self.per_page}&page={page}"
+
+        # Collect all filters
+        filters = []
+        if min_reference_count > 0:
+            filters.append(f"referenced_works_count:>{min_reference_count}")
+        if title_search:
+            filters.append(f"title.search:{urllib.parse.quote(title_search)}")
+        if start_published_date:
+            filters.append(f"from_publication_date:{start_published_date}")
+        if end_published_date:
+            filters.append(f"to_publication_date:{end_published_date}")
+        
+        # Add all filters as a single parameter if there are any
+        if filters:
+            url += f"&filter={','.join(filters)}"
+
         return url
 
     def _get_headers(self) -> dict:
@@ -58,7 +73,7 @@ class OpenAlexSearchClient(SearchClient):
     def _get_payload(self, query: str, start_published_date: str = None, end_published_date: str = None, **kwargs) -> dict:
         return None  # We don't need a payload for GET requests
 
-    async def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, **kwargs) -> dict:
+    async def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, sort: str = None, min_reference_count: int = 0, title_search: str = "", **kwargs) -> dict:
         results = []
         total_count = 0
         page = 1
@@ -68,11 +83,8 @@ class OpenAlexSearchClient(SearchClient):
         ssl_context = ssl.create_default_context(cafile=certifi.where())
 
         while len(results) < self.initial_top_to_retrieve:
-            url = self._get_search_url(query, sort, page)
+            url = self._get_search_url(query, sort, page, min_reference_count, title_search, start_published_date, end_published_date)
             
-            if start_published_date and end_published_date:
-                url += f"&filter=from_publication_date:{start_published_date},to_publication_date:{end_published_date}"
-
             logger.debug(f"Sending request to URL: {url}")
 
             headers = {}
@@ -144,7 +156,7 @@ class OpenAlexSearchClient(SearchClient):
 
         reranked_results = self._rerank_results(query, processed_results, main_question)
 
-        logger.debug(f"Reranked results: {json.dumps(reranked_results, indent=2)}")
+        logger.debug(f"Reranked {len(reranked_results)} results")
 
         result = {"results": reranked_results, "total_count": total_count}
 
@@ -180,7 +192,7 @@ class OpenAlexSearchClient(SearchClient):
         # 4. Transform arXiv links
         for location in locations:
             landing_page_url = self._safe_get(location, 'landing_page_url', '')
-            if landing_page_url.startswith('https://arxiv.org/abs/'):
+            if landing_page_url and landing_page_url.startswith('https://arxiv.org/abs/'):
                 add_unique(self._transform_arxiv_link(landing_page_url))
 
         return pdf_links
@@ -207,6 +219,7 @@ class OpenAlexSearchClient(SearchClient):
                     'pdf_urls_by_priority': self._extract_prioritized_pdf_links(result),
                     'text_type': 'abstract',
                     'successful_pdf_url': None,  # Initialize this field
+                    'referenced_works': self._safe_get(result, 'referenced_works', [])
                 }
 
                 abstract = self._reconstruct_abstract(self._safe_get(result, 'abstract_inverted_index', {}))
@@ -256,7 +269,7 @@ class OpenAlexSearchClient(SearchClient):
             return ""
 
     def _process_result(self, result: Dict) -> List[Dict]:
-        logger.debug(f"Processing result: {json.dumps(result, indent=2)}")
+        # logger.debug(f"Processing result: {json.dumps(result, indent=2)}")
         processed = super()._process_result(result)
         
         # Update the URL in meta to the successful PDF URL if it exists
@@ -264,7 +277,7 @@ class OpenAlexSearchClient(SearchClient):
             if item['meta'].get('successful_pdf_url'):
                 item['meta']['url'] = item['meta']['successful_pdf_url']
         
-        logger.debug(f"Processed result: {json.dumps(processed, indent=2)}")
+        # logger.debug(f"Processed result: {json.dumps(processed, indent=2)}")
         return processed
     
     def _rerank_results(self, query: str, results: List[Dict], main_question: str = None) -> List[Dict]:
@@ -316,6 +329,8 @@ async def main():
             sort="cited_by_count:desc",
 			start_published_date="2024-08-01", 
             end_published_date="2024-09-01",
+            min_reference_count=200,
+            title_search="survey"  # Add this parameter
 		)
 		end_time = time.time()
 		
