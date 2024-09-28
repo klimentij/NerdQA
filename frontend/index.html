@@ -448,6 +448,7 @@
 
             socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
+                console.log("Received WebSocket message:", data); // Debugging log
                 handleWebSocketMessage(data);
             };
 
@@ -462,6 +463,7 @@
         }
 
         function handleWebSocketMessage(data) {
+            console.log("Handling WebSocket message:", data); // Debugging log
             switch(data.type) {
                 case 'queries':
                     displayQueries(data.data, data.iteration);
@@ -470,10 +472,11 @@
                     displayStatements(data.data, data.iteration);
                     break;
                 case 'answer':
+                    console.log("Displaying answer:", data.data); // Debugging log
                     displayAnswer(data.data, data.iteration, data.summary, data.full_citation_tree);
                     break;
                 case 'feedback_received':
-                    console.log("Feedback received from server:", data.message);
+                    console.log("Feedback received from server:", data.message); // Debugging log
                     appendToChat('Feedback Received', `<p>${data.message}</p>`);
                     break;
                 default:
@@ -495,12 +498,19 @@
         }
 
         function displayAnswer(answer, iteration, summary, fullCitationTree) {
+            console.log("Updating report content with answer:", answer); // Debugging log
             currentIteration = iteration;
             
             // Update allEvidence with new evidence
-            Object.keys(fullCitationTree).forEach(stmtId => {
-                updateEvidenceFromTree(fullCitationTree[stmtId]);
-            });
+            if (fullCitationTree && typeof fullCitationTree === 'object') {
+                Object.keys(fullCitationTree).forEach(stmtId => {
+                    if (fullCitationTree[stmtId]) {
+                        updateEvidenceFromTree(fullCitationTree[stmtId]);
+                    }
+                });
+            } else {
+                console.warn("fullCitationTree is not a valid object:", fullCitationTree);
+            }
 
             const processedAnswer = processAnswer(answer);
             
@@ -526,14 +536,18 @@
             updateCitationTrees(fullCitationTree);
 
             // Add summary to chat
-            const summaryHtml = `
-                <ul>
-                    <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
-                    <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
-                    <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
-                </ul>
-            `;
-            appendToChat(`Iteration ${iteration} Summary`, summaryHtml);
+            if (summary) {
+                const summaryHtml = `
+                    <ul>
+                        <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
+                        <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
+                        <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
+                    </ul>
+                `;
+                appendToChat(`Iteration ${iteration} Summary`, summaryHtml);
+            } else {
+                console.warn("Summary data is missing");
+            }
         }
 
         function processAnswer(answer) {
@@ -552,13 +566,19 @@
         }
 
         function updateEvidenceFromTree(node) {
-            if (node.id.startsWith('E')) {
+            if (!node) return; // Add this check to handle undefined nodes
+
+            if (node.id && node.id.startsWith('E')) {
                 allEvidence[node.id] = {
                     text: node.text,
                     url: node.url
                 };
             }
-            node.children.forEach(updateEvidenceFromTree);
+            
+            // Check if children exists and is an array before calling forEach
+            if (Array.isArray(node.children)) {
+                node.children.forEach(updateEvidenceFromTree);
+            }
         }
 
         function closeAllCitationTrees() {
@@ -647,6 +667,7 @@
                 }));
                 questionScreen.style.display = 'none';
                 reportScreen.style.display = 'flex';
+                console.log("Switched to report screen");
                 reportContent.innerHTML = `<h2 class="report-title">Report for: "${question}"</h2>`;
                 chatMessages.innerHTML = '';
             }
