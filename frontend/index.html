@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Researcher Q&A</title>
+    <!-- Add this line to suppress favicon error -->
+    <!-- <link rel="icon" href="data:,"> -->
     <style>
         * {
             box-sizing: border-box;
@@ -434,56 +436,137 @@
         const startDateInput = document.getElementById('startDateInput');
         const endDateInput = document.getElementById('endDateInput');
 
-        let socket;
+        let currentSessionId = null;
+        let pollingInterval = null;
         let currentIteration = 0;
         let allStatements = {};
         let allEvidence = {};
 
-        function connectWebSocket() {
-            socket = new WebSocket('ws://localhost:8000/ws');
+        const API_BASE_URL = 'http://localhost:8000';
 
-            socket.onopen = function(e) {
-                console.log("WebSocket connection established");
-            };
+        async function startPipeline(question, iterations, numQueries, startDate, endDate) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/start_pipeline`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question,
+                        iterations,
+                        num_queries: numQueries,
+                        start_date: startDate,
+                        end_date: endDate
+                    }),
+                });
 
-            socket.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                if (data.type === "ping") {
-                    socket.send(JSON.stringify({type: "pong"}));
-                } else {
-                    handleWebSocketMessage(data);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to start pipeline: ${errorText}`);
                 }
-            };
 
-            socket.onclose = function(event) {
-                console.log("WebSocket connection closed");
-                setTimeout(connectWebSocket, 5000);  // Attempt to reconnect after 5 seconds
-            };
-
-            socket.onerror = function(error) {
-                console.error("WebSocket error:", error);
-            };
+                const data = await response.json();
+                currentSessionId = data.session_id;
+                startPolling();
+            } catch (error) {
+                console.error('Error starting pipeline:', error);
+                alert('Failed to start the research process. Please try again.');
+            }
         }
 
-        function handleWebSocketMessage(data) {
-            console.log("Handling WebSocket message:", data); // Debugging log
-            switch(data.type) {
-                case 'queries':
-                    displayQueries(data.data, data.iteration);
-                    break;
-                case 'statements':
-                    displayStatements(data.data, data.iteration);
-                    break;
-                case 'answer':
-                    console.log("Displaying answer:", data.data); // Debugging log
-                    displayAnswer(data.data, data.iteration, data.summary, data.full_citation_tree);
-                    break;
-                case 'feedback_received':
-                    console.log("Feedback received from server:", data.message); // Debugging log
-                    appendToChat('Feedback Received', `<p>${data.message}</p>`);
-                    break;
-                default:
-                    console.log('Unknown message type:', data.type);
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            pollingInterval = setInterval(pollPipelineStatus, 2000);
+        }
+
+        async function pollPipelineStatus() {
+            if (!currentSessionId) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/pipeline_status/${currentSessionId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch pipeline status');
+                }
+
+                const data = await response.json();
+                handlePipelineUpdate(data);
+
+                if (data.status === 'completed') {
+                    clearInterval(pollingInterval);
+                }
+            } catch (error) {
+                console.error('Error polling pipeline status:', error);
+            }
+        }
+
+        function handlePipelineUpdate(data) {
+            if (data.messages) {
+                data.messages.forEach(message => {
+                    switch (message.type) {
+                        case 'queries':
+                            displayQueries(message.data, message.iteration);
+                            break;
+                        case 'statements':
+                            displayStatements(message.data, message.iteration);
+                            break;
+                        case 'answer':
+                            displayAnswer(message.data, message.iteration, message.summary, message.full_citation_tree);
+                            break;
+                    }
+                });
+            }
+
+            if (data.status === 'completed') {
+                displayFinalAnswer(data.final_answer, data.full_citation_tree, data.summary);
+            }
+        }
+
+        async function sendFeedback(feedback) {
+            if (!currentSessionId) {
+                console.error('No active session');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/send_feedback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        feedback: feedback
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send feedback');
+                }
+
+                appendToChat('User Feedback', `<p>${feedback}</p>`);
+                chatInput.value = '';
+            } catch (error) {
+                console.error('Error sending feedback:', error);
+                alert('Failed to send feedback. Please try again.');
+            }
+        }
+
+        function submitQuestionHandler() {
+            const question = questionInput.value.trim();
+            const iterations = parseInt(iterationsInput.value, 10);
+            const numQueries = parseInt(queriesInput.value, 10);
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+
+            if (question) {
+                startPipeline(question, iterations, numQueries, startDate, endDate);
+                questionScreen.style.display = 'none';
+                reportScreen.style.display = 'flex';
+                console.log("Switched to report screen");
+                reportContent.innerHTML = `<h2 class="report-title">Report for: "${question}"</h2>`;
+                chatMessages.innerHTML = '';
             }
         }
 
@@ -645,6 +728,18 @@
             return html;
         }
 
+        function displayFinalAnswer(answer, fullCitationTree, summary) {
+            displayAnswer(answer, currentIteration, summary, fullCitationTree);
+            
+            const finalStatusHtml = `
+                <h3 class="report-status final">
+                    <i class="fas fa-check-circle"></i>
+                    Final report
+                </h3>
+            `;
+            reportContent.insertAdjacentHTML('afterbegin', finalStatusHtml);
+        }
+
         submitQuestion.addEventListener('click', submitQuestionHandler);
 
         questionInput.addEventListener('keypress', (e) => {
@@ -652,29 +747,6 @@
                 submitQuestionHandler();
             }
         });
-
-        function submitQuestionHandler() {
-            const question = questionInput.value.trim();
-            const iterations = parseInt(iterationsInput.value, 10);
-            const numQueries = parseInt(queriesInput.value, 10);
-            const startDate = startDateInput.value;
-            const endDate = endDateInput.value;
-
-            if (question && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    question: question,
-                    iterations: iterations,
-                    num_queries: numQueries,
-                    start_date: startDate,
-                    end_date: endDate
-                }));
-                questionScreen.style.display = 'none';
-                reportScreen.style.display = 'flex';
-                console.log("Switched to report screen");
-                reportContent.innerHTML = `<h2 class="report-title">Report for: "${question}"</h2>`;
-                chatMessages.innerHTML = '';
-            }
-        }
 
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -685,19 +757,12 @@
             }
         });
 
-        function sendFeedback(feedback) {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    feedback: feedback
-                }));
-                appendToChat('User Feedback', `<p>${feedback}</p>`);
-                chatInput.value = '';
-            } else {
-                console.error('WebSocket is not open. Unable to send feedback.');
-            }
-        }
-
         newButton.addEventListener('click', () => {
+            clearInterval(pollingInterval);
+            currentSessionId = null;
+            currentIteration = 0;
+            allStatements = {};
+            allEvidence = {};
             reportScreen.style.display = 'none';
             questionScreen.style.display = 'flex';
             questionInput.value = '';
@@ -733,8 +798,6 @@
         // Call adjustLayout on page load and window resize
         window.addEventListener('load', adjustLayout);
         window.addEventListener('resize', adjustLayout);
-
-        connectWebSocket();
     </script>
 </body>
 </html>

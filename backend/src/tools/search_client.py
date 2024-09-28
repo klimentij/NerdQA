@@ -19,7 +19,7 @@ from src.util.env_util import cfg
 from src.db.local_cache import LocalCache
 from src.util.setup_logging import setup_logging
 
-logger = setup_logging(__file__, log_level="DEBUG")
+logger = setup_logging(__file__, log_level="INFO")
 
 # Add this constant at the script level
 USER_AGENTS = [
@@ -143,7 +143,7 @@ class SearchClient(ABC):
             logger.info(f"Processed and chunked {len(filtered_results)} results (turned into {len(processed_results)} results) in {processing_time:.2f} seconds")
             
             # Log unchunked results before reranker
-            logger.info(f"Unchunked results before reranker: {json.dumps(filtered_results, indent=2)}")
+            logger.debug(f"Unchunked results before reranker: {json.dumps(filtered_results, indent=2)}")
             
             # Rerank the results if enabled
             reranked_results = self._rerank_results(query, processed_results, main_question)

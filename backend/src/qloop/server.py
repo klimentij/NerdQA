@@ -10,8 +10,8 @@ import json
 import os
 import random
 import sys
-from typing import List
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from typing import List, Dict, Optional
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
@@ -19,6 +19,7 @@ import re
 from inspect import iscoroutinefunction
 import hashlib
 from fastapi.responses import JSONResponse
+import uuid
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -38,14 +39,26 @@ app = FastAPI()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Add your Vercel URL when you deploy
+    allow_origins=["*"],  # Allow all origins for now. In production, specify your frontend URL.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class Question(BaseModel):
-    content: str
+# In-memory storage for session data
+sessions: Dict[str, Dict] = {}
+
+class QuestionRequest(BaseModel):
+    question: str
+    iterations: int = 1
+    num_queries: int = 1
+    start_date: str = "1900-01-20"
+    end_date: Optional[str] = None
+    search_client: Optional[str] = None
+
+class FeedbackRequest(BaseModel):
+    session_id: str
+    feedback: str
 
 class PipelineOrchestrator:
     def __init__(self):
@@ -128,98 +141,68 @@ search_client_map = {
     "openalex": OpenAlexSearchClient
 }
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            try:
-                data = await asyncio.wait_for(websocket.receive_json(), timeout=30)  # 30 seconds timeout
-                logger.info(f"Received data: {data}")
-                if "question" in data:
-                    main_question = data["question"]
-                    iterations = data.get("iterations", 1)
-                    num_queries = data.get("num_queries", 1)
-                    start_date = data.get("start_date", "1900-01-20")
-                    end_date = data.get("end_date", time.strftime("%Y-%m-%d"))
-                    search_client_name = data.get("search_client", None)
+@app.options("/start_pipeline")
+async def options_start_pipeline():
+    return {"message": "OK"}
 
-                    if not main_question:
-                        await websocket.send_json({"error": "No question provided"})
-                        continue
-
-                    search_client = None
-                    if search_client_name and search_client_name in search_client_map:
-                        search_client = search_client_map[search_client_name]()
-
-                    await run_pipeline(websocket, main_question, iterations, num_queries, start_date, end_date, search_client)
-            except asyncio.TimeoutError:
-                await websocket.send_json({"type": "ping"})
-    except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
-    except Exception as e:
-        logger.error(f"WebSocket error: {str(e)}")
-
-class MockWebSocket:
-    def __init__(self):
-        self.messages = []
-
-    async def send_json(self, message):
-        self.messages.append(message)
-
-@app.get("/run_pipeline")
-async def run_pipeline_endpoint(
-    question: str,
-    iterations: int = 1,
-    num_queries: int = 1,
-    start_date: str = "1900-01-20",
-    end_date: str = None,
-    search_client: str = None
-):
-    if not question:
-        raise HTTPException(status_code=400, detail="No question provided")
-
-    if end_date is None:
-        end_date = time.strftime("%Y-%m-%d")
-
-    search_client_instance = None
-    if search_client and search_client in search_client_map:
-        search_client_instance = search_client_map[search_client]()
-
-    mock_websocket = MockWebSocket()
-    
-    await run_pipeline(
-        mock_websocket,
-        question,
-        iterations,
-        num_queries,
-        start_date,
-        end_date,
-        search_client_instance
-    )
-
-    # Process the collected messages to create the final response
-    final_answer = ""
-    full_citation_tree = {}
-    summary = {}
-
-    for message in mock_websocket.messages:
-        if message["type"] == "answer":
-            final_answer = message["data"]
-            full_citation_tree = message["full_citation_tree"]
-            summary = message["summary"]
-
-    return JSONResponse({
-        "answer": final_answer,
-        "summary": summary,
-        "full_citation_tree": full_citation_tree
-    })
-
-async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
-    web_search = web_search or ExaSearchClient()
+@app.post("/start_pipeline")
+async def start_pipeline(request: QuestionRequest, background_tasks: BackgroundTasks):
+    session_id = str(uuid.uuid4())
     orchestrator = PipelineOrchestrator()
-    orchestrator.statement_generator = StatementGenerator(web_search=web_search)
-    orchestrator.main_question = main_question
+    orchestrator.main_question = request.question
+    
+    sessions[session_id] = {
+        "orchestrator": orchestrator,
+        "status": "running",
+        "current_iteration": 0,
+        "total_iterations": request.iterations,
+        "messages": [],
+        "final_answer": "",
+        "full_citation_tree": {},
+        "summary": {}
+    }
+    
+    background_tasks.add_task(
+        run_pipeline,
+        session_id,
+        request.question,
+        request.iterations,
+        request.num_queries,
+        request.start_date,
+        request.end_date or time.strftime("%Y-%m-%d"),
+        search_client_map.get(request.search_client, ExaSearchClient)()
+    )
+    
+    return {"session_id": session_id}
+
+@app.get("/pipeline_status/{session_id}")
+async def pipeline_status(session_id: str):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[session_id]
+    return {
+        "status": session["status"],
+        "current_iteration": session["current_iteration"],
+        "total_iterations": session["total_iterations"],
+        "messages": session["messages"],
+        "final_answer": session["final_answer"],
+        "full_citation_tree": session["full_citation_tree"],
+        "summary": session["summary"]
+    }
+
+@app.post("/send_feedback")
+async def send_feedback(request: FeedbackRequest):
+    if request.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    orchestrator = sessions[request.session_id]["orchestrator"]
+    orchestrator.add_user_feedback(request.feedback)
+    return {"message": "Feedback received"}
+
+async def run_pipeline(session_id: str, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
+    session = sessions[session_id]
+    orchestrator = session["orchestrator"]
     all_statements = {}
     all_evidence = {}
     all_evidence_ids = set()
@@ -227,6 +210,8 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
     total_statements = 0
 
     for iteration in range(iterations):
+        session["current_iteration"] = iteration + 1
+        
         if iteration == 0:
             next_queries = [main_question]
         else:
@@ -234,7 +219,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
                 main_question, "", num_queries, iteration, start_date, end_date
             )
 
-        await websocket.send_json({
+        session["messages"].append({
             "type": "queries",
             "data": next_queries[:num_queries],
             "iteration": iteration + 1
@@ -282,7 +267,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
                         if evidence_data:
                             all_evidence[evidence] = evidence_data
 
-            await websocket.send_json({
+            session["messages"].append({
                 "type": "statements",
                 "data": statements,
                 "iteration": iteration + 1,
@@ -310,7 +295,7 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             "total_statements": total_statements
         }
 
-        await websocket.send_json({
+        session["messages"].append({
             "type": "answer",
             "data": answer,
             "iteration": iteration + 1,
@@ -318,7 +303,11 @@ async def run_pipeline(websocket: WebSocket, main_question: str, iterations: int
             "full_citation_tree": full_citation_tree
         })
 
-        orchestrator.current_history += f"\nIteration {iteration + 1} completed.\n"
+        session["final_answer"] = answer
+        session["full_citation_tree"] = full_citation_tree
+        session["summary"] = iteration_summary
+
+    session["status"] = "completed"
 
 def generate_citation_tree_data(all_statements, all_evidence, max_depth=5):
     def build_tree(node_id, depth=0, visited=None):
