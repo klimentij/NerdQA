@@ -417,7 +417,7 @@
                 <div id="chatMessages">
                     <!-- Chat messages will be inserted here -->
                 </div>
-                <input type="text" id="chatInput" placeholder="Type your feedback...">
+                <!-- Removed: <input type="text" id="chatInput" placeholder="Type your feedback..."> -->
             </div>
         </div>
     </div>
@@ -429,7 +429,7 @@
         const submitQuestion = document.getElementById('submitQuestion');
         const reportContent = document.getElementById('reportContent');
         const chatMessages = document.getElementById('chatMessages');
-        const chatInput = document.getElementById('chatInput');
+        // Removed: const chatInput = document.getElementById('chatInput');
         const newButton = document.getElementById('newButton');
         const iterationsInput = document.getElementById('iterationsInput');
         const queriesInput = document.getElementById('queriesInput');
@@ -523,35 +523,7 @@
             }
         }
 
-        async function sendFeedback(feedback) {
-            if (!currentSessionId) {
-                console.error('No active session');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/send_feedback`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        session_id: currentSessionId,
-                        feedback: feedback
-                    }),
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to send feedback');
-                }
-
-                appendToChat('User Feedback', `<p>${feedback}</p>`);
-                chatInput.value = '';
-            } catch (error) {
-                console.error('Error sending feedback:', error);
-                alert('Failed to send feedback. Please try again.');
-            }
-        }
+        // Remove the sendFeedback function and its related event listener
 
         function submitQuestionHandler() {
             const question = questionInput.value.trim();
@@ -741,14 +713,15 @@
             }
         });
 
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const feedback = chatInput.value.trim();
-                if (feedback) {
-                    sendFeedback(feedback);
-                }
-            }
-        });
+        // Remove this event listener
+        // chatInput.addEventListener('keypress', (e) => {
+        //     if (e.key === 'Enter') {
+        //         const feedback = chatInput.value.trim();
+        //         if (feedback) {
+        //             sendFeedback(feedback);
+        //         }
+        //     }
+        // });
 
         newButton.addEventListener('click', () => {
             clearInterval(pollingInterval);
@@ -773,18 +746,18 @@
             const isMobile = window.innerWidth <= 1024;
             const reportContainer = document.querySelector('.report-container');
             const chatContent = document.getElementById('chatContent');
-            const chatInput = document.getElementById('chatInput');
+            // Removed: const chatInput = document.getElementById('chatInput');
 
             if (isMobile) {
                 reportContainer.style.height = 'auto';
                 reportContainer.style.minHeight = '100vh';
                 chatContent.style.height = 'auto';
-                chatInput.style.position = 'fixed';
+                // Removed: chatInput.style.position = 'fixed';
             } else {
                 reportContainer.style.height = '100%';
                 reportContainer.style.minHeight = 'auto';
                 chatContent.style.height = '100%';
-                chatInput.style.position = 'static';
+                // Removed: chatInput.style.position = 'static';
             }
         }
 
