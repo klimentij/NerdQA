@@ -730,14 +730,7 @@
 
         function displayFinalAnswer(answer, fullCitationTree, summary) {
             displayAnswer(answer, currentIteration, summary, fullCitationTree);
-            
-            const finalStatusHtml = `
-                <h3 class="report-status final">
-                    <i class="fas fa-check-circle"></i>
-                    Final report
-                </h3>
-            `;
-            reportContent.insertAdjacentHTML('afterbegin', finalStatusHtml);
+
         }
 
         submitQuestion.addEventListener('click', submitQuestionHandler);
