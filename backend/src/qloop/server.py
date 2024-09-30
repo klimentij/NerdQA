@@ -61,8 +61,8 @@ class FeedbackRequest(BaseModel):
     feedback: str
 
 class PipelineOrchestrator:
-    def __init__(self):
-        self.statement_generator = StatementGenerator()
+    def __init__(self, web_search: SearchClient = None):
+        self.statement_generator = StatementGenerator(web_search=web_search)
         self.query_generator = QueryGenerator()
         self.answer_generator = AnswerGenerator()
         self.pipeline_start_ts = int(time.time())
@@ -148,7 +148,8 @@ async def options_start_pipeline():
 @app.post("/start_pipeline")
 async def start_pipeline(request: QuestionRequest, background_tasks: BackgroundTasks):
     session_id = str(uuid.uuid4())
-    orchestrator = PipelineOrchestrator()
+    web_search = search_client_map.get(request.search_client, ExaSearchClient)()
+    orchestrator = PipelineOrchestrator(web_search=web_search)
     orchestrator.main_question = request.question
     
     sessions[session_id] = {
@@ -170,7 +171,7 @@ async def start_pipeline(request: QuestionRequest, background_tasks: BackgroundT
         request.num_queries,
         request.start_date,
         request.end_date or time.strftime("%Y-%m-%d"),
-        search_client_map.get(request.search_client, ExaSearchClient)()
+        web_search
     )
     
     return {"session_id": session_id}
@@ -203,6 +204,10 @@ async def send_feedback(request: FeedbackRequest):
 async def run_pipeline(session_id: str, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
     session = sessions[session_id]
     orchestrator = session["orchestrator"]
+    
+    # Update the StatementGenerator with the provided web_search client
+    orchestrator.statement_generator = StatementGenerator(web_search=web_search)
+
     all_statements = {}
     all_evidence = {}
     all_evidence_ids = set()
