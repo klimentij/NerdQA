@@ -1,0 +1,18 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "question_response",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "A clear, concise question (1-2 sentences) that would elicit the given survey paper as a response. The question should cover the main themes and scope of the paper, focus on current approaches, challenges, and future directions in the field, avoid mentioning specific innovations or terms unique to the paper, and sound natural, as if asked by a curious researcher in the field."
+        }
+      },
+      "required": ["question"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

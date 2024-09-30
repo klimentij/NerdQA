@@ -17,14 +17,14 @@ class SeedPapersConfig(BaseModel):
     max_papers_to_seed: int = 10
     min_reference_count: int = 200
 
-class QAGenerationConfig(BaseModel):
+class QuestionGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     chunk_size: int = 256
     chunk_overlap: int = 0
 
 class PipelineConfig(BaseModel):
-    iterations: int = 5
-    num_queries: int = 5
+    iterations: int = 1
+    num_queries: int = 1
     search_client: str = "openalex"
 
 class EvaluationConfig(BaseModel):
@@ -34,12 +34,12 @@ class EvaluationConfig(BaseModel):
 class BenchmarkConfig(BaseModel):
     project_name: str = "ADE"
     seed_papers: SeedPapersConfig = Field(default_factory=SeedPapersConfig)
-    qa_generation: QAGenerationConfig = Field(default_factory=QAGenerationConfig)
+    question_generation: QuestionGenerationConfig = Field(default_factory=QuestionGenerationConfig)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: str = "benchmark/runs"
-    system: str = "baseline_no_rag" 
-    # system: str = "ade"
+    # system: str = "baseline_no_rag"
+    system: str = "ade"
 
 # Create a default configuration
 default_config = BenchmarkConfig()

@@ -20,7 +20,7 @@ async def run_pipeline_request(data: Dict[str, Any], config: PipelineConfig) -> 
         "question": data["question_generated"],
         "iterations": config.iterations,
         "num_queries": config.num_queries,
-        "end_date": (datetime.strptime(data["meta"]["publication_date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"),
+        "end_date": (datetime.strptime(data["publication_date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"),
         "search_client": config.search_client
     }
 

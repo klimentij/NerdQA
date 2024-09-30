@@ -1,13 +1,13 @@
 caching: true
 
 completion_kwargs:
-  # model: gpt-4o-mini
-  model: gpt-4o-2024-08-06
+  model: gpt-4o-mini
+  # model: gpt-4o-2024-08-06
   temperature: 0.1
   max_tokens: 4000
 
 
 trims:
-  - name: 'REPORT'
+  - name: 'PAPER'
     trim_type: 'END'
-    max_length: 60000
+    max_length: 10000
