@@ -208,6 +208,7 @@ class OpenAlexSearchClient(SearchClient):
             try:
                 meta = {
                     'id': self._safe_get(result, 'id', ''),
+                    'openalex_id': self._safe_get(result, 'id', ''),  # Add this line
                     'title': self._safe_get(result, 'title', ''),
                     'publication_date': self._safe_get(result, 'publication_date', ''),
                     'cited_by_count': self._safe_get(result, 'cited_by_count', 0),

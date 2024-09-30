@@ -38,15 +38,15 @@ def generate_questions(seed_papers: List[Dict[str, Any]], config: QuestionGenera
     processed_papers = []
     for i, paper in enumerate(seed_papers[:config.max_papers_to_process]):
         pipeline_start_ts = int(time.time())
-        trace_name = f"BM GenQuestion for {paper['meta']['title']}"
+        trace_name = f"BM GenQuestion for {paper['title']}"
         trace_id = f"T{pipeline_start_ts}_{i+1}"
         session_id = f"S{pipeline_start_ts}_{i+1}"
 
         paper_info = {
-            "title": paper['meta']['title'],
-            "topic": paper['meta'].get('topic', ''),
-            "keywords": paper['meta'].get('keywords', []),
-            "concepts": paper['meta'].get('concepts', []),
+            "title": paper['title'],
+            "topic": paper.get('topic', ''),
+            "keywords": paper.get('keywords', []),
+            "concepts": paper.get('concepts', []),
             "text": paper['text']
         }
 

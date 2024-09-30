@@ -10,7 +10,8 @@ from backend.src.benchmark.config import PipelineConfig
 logger = setup_logging(__file__, log_level="DEBUG")
 
 async def run_pipeline_request(data: Dict[str, Any], config: PipelineConfig) -> Tuple[Any, Any]:
-    url = "http://localhost:8000/run_pipeline"
+    start_pipeline_url = "http://localhost:8000/start_pipeline"
+    status_url = "http://localhost:8000/pipeline_status/"
     retries = 0
     max_retries = 3
     retry_delay = 5
@@ -24,30 +25,48 @@ async def run_pipeline_request(data: Dict[str, Any], config: PipelineConfig) -> 
         "search_client": config.search_client
     }
 
-    while retries < max_retries:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, timeout=timeout) as response:
+    async with aiohttp.ClientSession() as session:
+        while retries < max_retries:
+            try:
+                # Start the pipeline
+                async with session.post(start_pipeline_url, json=params, timeout=timeout) as response:
                     if response.status == 200:
                         result = await response.json()
-                        return result["answer"], result["full_citation_tree"]
+                        session_id = result["session_id"]
                     else:
-                        logger.error(f"Error response: {response.status}")
+                        logger.error(f"Error starting pipeline: {response.status}")
                         return None, None
-        except aiohttp.ClientError as e:
-            logger.error(f"Request error: {e}")
-            retries += 1
-            if retries < max_retries:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-            else:
-                logger.error("Max retries reached. Giving up.")
+
+                # Poll for pipeline status
+                while True:
+                    async with session.get(status_url + session_id, timeout=timeout) as response:
+                        if response.status == 200:
+                            status = await response.json()
+                            if status["status"] == "completed":
+                                return status["final_answer"], status["full_citation_tree"]
+                            elif status["status"] == "running":
+                                await asyncio.sleep(1) 
+                            else:
+                                logger.error(f"Unexpected pipeline status: {status['status']}")
+                                return None, None
+                        else:
+                            logger.error(f"Error checking pipeline status: {response.status}")
+                            return None, None
+
+            except aiohttp.ClientError as e:
+                logger.error(f"Request error: {e}")
+                retries += 1
+                if retries < max_retries:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    logger.error("Max retries reached. Giving up.")
+                    return None, None
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout: No response received within {timeout} seconds")
                 return None, None
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout: No response received within {timeout} seconds")
-            return None, None
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return None, None
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                return None, None
 
     return None, None

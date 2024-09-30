@@ -376,7 +376,8 @@ def generate_full_citation_tree(all_statements, all_evidence, cited_statements, 
             reference = {
                 'id': node_id,
                 'text': evidence.get('text', "Evidence text not found"),
-                'url': evidence.get('meta', {}).get('url', "")
+                'url': evidence.get('meta', {}).get('url', ""),
+                'openalex_id': evidence.get('meta', {}).get('openalex_id', "")  # Add this line
             }
             if reference['url'] == "":
                 # possibly a paper
