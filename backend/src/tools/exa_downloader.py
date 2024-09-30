@@ -77,6 +77,7 @@ class ExaDownloader:
             tasks = []
             for result in results:
                 openalex_id = result['meta'].get('id', 'Unknown ID')
+                result['meta']['openalex_id'] = openalex_id
                 if self.use_cache and self.cache:
                     cached_text = self.cache.get(openalex_id)
                 else:

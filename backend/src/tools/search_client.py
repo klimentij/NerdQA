@@ -19,7 +19,7 @@ from src.util.env_util import cfg
 from src.db.local_cache import LocalCache
 from src.util.setup_logging import setup_logging
 
-logger = setup_logging(__file__, log_level="INFO")
+logger = setup_logging(__file__, log_level="DEBUG")
 
 # Add this constant at the script level
 USER_AGENTS = [
@@ -111,7 +111,7 @@ class SearchClient(ABC):
         if self.cache:
             cached_response = self.cache.get(cache_key)
             if cached_response is not None:
-                logger.debug("Returning cached results")
+                logger.debug(f"Returning cached results: {json.dumps(cached_response, indent=2)}")
                 return cached_response
         
         try:
