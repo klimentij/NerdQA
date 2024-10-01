@@ -14,25 +14,32 @@ async def generate_naive_rag_answer(question: str, publication_date: str, metada
     logger.info("Generating naive RAG answer")
     config = load_config()
     
-    # Initialize the search client based on the config
     search_client_class = search_client_map.get(config.pipeline.search_client, search_client_map["exa"])
     search_client = search_client_class()
     
-    # Calculate end_date as one day before the paper's publication date
     end_published_date = (datetime.strptime(publication_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     
-    # Perform the search
     search_results = await search_client.search(
         question,
         end_published_date=end_published_date
     )
+    
+    # Prepare limited results for completion
+    limited_results = [
+        {
+            "id": result.get("id"),
+            "meta": result.get("limited_meta", result.get("meta", {})),
+            "text": result.get("text", "")
+        }
+        for result in search_results.get('results', [])
+    ]
     
     logger.info("Generating answer using the NaiveRAG skill")
     skill = Completion(('Benchmark', 'Baseline', 'NaiveRAG'))
     result = await asyncio.to_thread(skill.complete,
         prompt_inputs={
             "MAIN_QUESTION": question,
-            "SEARCH_RESULTS": search_results,
+            "SEARCH_RESULTS": json.dumps(limited_results),
         },
         completion_kwargs={
             "metadata": metadata,
@@ -46,18 +53,16 @@ async def generate_naive_rag_answer(question: str, publication_date: str, metada
         logger.error(f"Failed to parse result content: {result.content}")
         raise ValueError("Invalid response format from NaiveRAG skill")
 
-    # Parse E.. ids from inline references
     evidence_ids = re.findall(r'E(\d+)', answer)
     evidence_ids = list(set([f'E{id}' for id in evidence_ids]))
     logger.info(f"Extracted evidence IDs: {evidence_ids}")
 
-    # Convert E.. ids to openalex_ids
     openalex_ids = []
     for result in search_results.get('results', []):
         try:
             result_id = result.get('id', '')
             if result_id in evidence_ids:
-                meta = result.get('meta', {})
+                meta = result.get('meta', {})  # Use full meta here
                 openalex_id = meta.get('openalex_id')
                 if openalex_id:
                     openalex_ids.append(openalex_id)

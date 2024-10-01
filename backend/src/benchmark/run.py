@@ -105,6 +105,12 @@ async def run_benchmark(config: BenchmarkConfig):
         json.dump(final_output, f, indent=2)
 
     logger.info(f"Results saved to {static_output_file}")
+
+    # Save last_run.json as a wandb artifact
+    artifact = wandb.Artifact("last_run", type="benchmark_results")
+    artifact.add_file(static_output_file)
+    wandb.log_artifact(artifact)
+
     wandb.finish()
 
 
