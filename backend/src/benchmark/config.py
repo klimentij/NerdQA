@@ -1,6 +1,21 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, List, Optional, Union, Generic, TypeVar
 from datetime import date
+
+T = TypeVar('T')
+
+class Probe(BaseModel, Generic[T]):
+    """A wrapper class for parameters that should be tested in the grid search."""
+    values: List[T]
+
+    def __iter__(self):
+        return iter(self.values)
+
+    def __getitem__(self, index):
+        return self.values[index]
+
+    def __len__(self):
+        return len(self.values)
 
 class SeedPapersConfig(BaseModel):
     query: str = ""
@@ -21,7 +36,7 @@ class QuestionGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     
 class PipelineConfig(BaseModel):
-    iterations: int = 2
+    iterations: int = 20
     num_queries: int = 2
     search_client: str = "openalex"
 
@@ -29,17 +44,20 @@ class EvaluationConfig(BaseModel):
     retrieval_k: int = 10
 
 class BenchmarkConfig(BaseModel):
-    project_name: str = "ADE_ResearchArena2"
+    project_name: str = "ADE_ResearchArena4"
     seed_papers: SeedPapersConfig = Field(default_factory=SeedPapersConfig)
     question_generation: QuestionGenerationConfig = Field(default_factory=QuestionGenerationConfig)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: str = "benchmark/runs"
-    # system: str = "baseline_no_rag"
-    system: str = "ade"
-    # system: str = "baseline_naive_rag"
-    # system: str = "baseline_title"
-
+    system: Union[str, Probe[str]] = Probe(
+        values=[
+            # "baseline_no_rag", 
+            # "baseline_title", 
+            # "baseline_naive_rag",
+            "ade"
+        ]
+    )
 # Create a default configuration
 default_config = BenchmarkConfig()
 

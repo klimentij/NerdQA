@@ -1,6 +1,7 @@
 # python -m backend.src.benchmark.run
 import asyncio
 import os
+import sys
 import json
 import time
 import wandb
@@ -115,5 +116,10 @@ async def run_benchmark(config: BenchmarkConfig):
 
 
 if __name__ == "__main__":
-    config = load_config()
+    if len(sys.argv) > 2 and sys.argv[1] == "--config":
+        config_json = sys.argv[2]
+        config = BenchmarkConfig.model_validate_json(config_json)
+    else:
+        config = BenchmarkConfig()  # Use default config if not provided
+    
     asyncio.run(run_benchmark(config))
