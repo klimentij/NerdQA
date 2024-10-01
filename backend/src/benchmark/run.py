@@ -85,7 +85,7 @@ async def run_benchmark(config: BenchmarkConfig):
     papers_with_answers = await asyncio.gather(*tasks)
 
     # Evaluate results
-    papers_with_answers, avg_metrics = evaluate_papers(papers_with_answers)
+    papers_with_answers, avg_metrics = evaluate_papers(papers_with_answers, config.evaluation.retrieval_k)
 
     # Log average metrics to wandb summary
     for k, v in avg_metrics.items():

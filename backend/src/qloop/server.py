@@ -65,18 +65,15 @@ class PipelineOrchestrator:
         self.statement_generator = StatementGenerator(web_search=web_search)
         self.query_generator = QueryGenerator()
         self.answer_generator = AnswerGenerator()
-        self.pipeline_start_ts = int(time.time())
-        self.trace_id = f"T{self.pipeline_start_ts}"
-        self.session_id = f"S{self.pipeline_start_ts}"
         self.main_question = ""
         self.user_feedback = []
         self.current_history = ""
+        self.reset_ids()
 
     def reset_ids(self):
-        self.pipeline_start_ts = str(int(time.time()))
-        question_hash = hashlib.md5(self.main_question.encode()).hexdigest()[-4:]
-        self.trace_id = f"T{self.pipeline_start_ts}-{question_hash}"
-        self.session_id = f"S{self.pipeline_start_ts}-{question_hash}"
+        self.pipeline_uuid = str(uuid.uuid4())
+        self.trace_id = f"T{self.pipeline_uuid}"
+        self.session_id = f"S{self.pipeline_uuid}"
 
     def get_metadata(self, iteration=None, query_index=None):
         metadata = {

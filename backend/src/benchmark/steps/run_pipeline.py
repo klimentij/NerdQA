@@ -8,6 +8,7 @@ from backend.src.util.setup_logging import setup_logging
 from backend.src.benchmark.config import PipelineConfig, BenchmarkConfig
 from backend.src.benchmark.steps.baselines.no_rag import generate_no_rag_answer
 from backend.src.benchmark.steps.baselines.naive_rag import generate_naive_rag_answer
+from backend.src.benchmark.steps.baselines.title import title_search
 
 logger = setup_logging(__file__, log_level="DEBUG")
 
@@ -101,6 +102,10 @@ async def run_pipeline_for_paper(paper: Dict[str, Any], config: BenchmarkConfig,
         paper['pipeline_answer'] = answer
     elif config.system == "baseline_naive_rag":
         answer, openalex_ids = await generate_naive_rag_answer(paper["question_generated"], paper["publication_date"], metadata)
+        paper['pipeline_answer'] = answer
+        paper['pipeline_source_papers'] = openalex_ids
+    elif config.system == "baseline_title":
+        answer, openalex_ids = await title_search(paper["title"], paper["publication_date"])
         paper['pipeline_answer'] = answer
         paper['pipeline_source_papers'] = openalex_ids
     else:

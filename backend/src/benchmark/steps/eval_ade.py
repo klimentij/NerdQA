@@ -9,10 +9,12 @@ from backend.src.benchmark.config import BenchmarkConfig, EvaluationConfig
 import time
 import numpy as np
 from nltk.tokenize import word_tokenize
-from nltk.translate.bleu_score import sentence_bleu
-from rouge import Rouge
+from rouge_score import rouge_scorer
 import re
 import wandb
+import multiprocessing
+from functools import partial
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 logger = setup_logging(__file__, log_level="DEBUG")
 
@@ -75,12 +77,16 @@ def create_metadata(trace_name: str, trace_id: str, session_id: str) -> Dict[str
         "session_id": session_id
     }
 
-def calculate_retrieval_metrics(referenced_works, pipeline_source_papers):
-    """Calculate precision and recall for retrieval."""
-    true_positives = set(referenced_works) & set(pipeline_source_papers)
-    precision = len(true_positives) / len(pipeline_source_papers) if pipeline_source_papers else 0
-    recall = len(true_positives) / len(referenced_works) if referenced_works else 0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+def calculate_retrieval_metrics(referenced_works, pipeline_source_papers, k):
+    """Calculate precision@k, recall@k, and f1@k for retrieval using sklearn."""
+    all_papers = set(referenced_works) | set(pipeline_source_papers[:k])
+    y_true = [1 if paper in referenced_works else 0 for paper in all_papers]
+    y_pred = [1 if paper in pipeline_source_papers[:k] else 0 for paper in all_papers]
+
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
+
     return precision, recall, f1
 
 def preprocess_text(text):
@@ -91,18 +97,20 @@ def preprocess_text(text):
     return text.strip()
 
 def calculate_text_similarity_metrics(reference, hypothesis):
-    """Calculate BLEU, ROUGE, and F1 scores for text similarity."""
+    """Calculate ROUGE and F1 scores for text similarity."""
+    logger.info(f"Preprocessing reference and hypothesis")
     reference_processed = preprocess_text(reference)
     hypothesis_processed = preprocess_text(hypothesis)
     
+    logger.info(f"Tokenizing reference and hypothesis")
     reference_tokens = word_tokenize(reference_processed)
     hypothesis_tokens = word_tokenize(hypothesis_processed)
     
-    bleu = sentence_bleu([reference_tokens], hypothesis_tokens)
+    logger.info(f"Calculating ROUGE score")
+    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    rouge_scores = scorer.score(reference_processed, hypothesis_processed)
     
-    rouge = Rouge()
-    rouge_scores = rouge.get_scores(hypothesis_processed, reference_processed)[0]
-    
+    logger.info(f"Calculating F1 score")
     reference_set = set(reference_tokens)
     hypothesis_set = set(hypothesis_tokens)
     true_positives = len(reference_set & hypothesis_set)
@@ -110,44 +118,82 @@ def calculate_text_similarity_metrics(reference, hypothesis):
     recall = true_positives / len(reference_set) if reference_set else 0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
     
-    return bleu, rouge_scores, f1
+    return rouge_scores, f1
 
-def evaluate_papers(papers_with_answers):
-    """Evaluate papers and calculate metrics."""
-    all_metrics = {
-        'retrieval_precision': [], 'retrieval_recall': [], 'retrieval_f1': [],
-        'bleu': [], 'rouge_1': [], 'rouge_2': [], 'rouge_l': [], 'text_f1': []
+def evaluate_single_paper(paper, retrieval_k):
+    """Evaluate a single paper and calculate metrics."""
+    logger.info(f"Evaluating paper: {paper.get('title')}")
+    precision, recall, f1 = calculate_retrieval_metrics(
+        paper.get('referenced_works', []),
+        paper.get('pipeline_source_papers', []),
+        retrieval_k
+    )
+
+    logger.info(f"Calculating text similarity metrics for paper: {paper.get('title')}")
+    rouge_scores, text_f1 = calculate_text_similarity_metrics(
+        paper.get('text', ''),
+        paper.get('pipeline_answer', '')
+    )
+
+    evaluation = {
+        f'precision@{retrieval_k}': precision, 
+        f'recall@{retrieval_k}': recall, 
+        f'f1@{retrieval_k}': f1,
+        'rouge_1': rouge_scores['rouge1'].fmeasure,
+        'rouge_2': rouge_scores['rouge2'].fmeasure, 
+        'rouge_l': rouge_scores['rougeL'].fmeasure,
+        'text_f1': text_f1,
+        'num_source_papers': len(paper.get('pipeline_source_papers', []))
     }
 
-    for paper in papers_with_answers:
-        precision, recall, f1 = calculate_retrieval_metrics(
-            paper.get('referenced_works', []),
-            paper.get('pipeline_source_papers', [])
-        )
-        all_metrics['retrieval_precision'].append(precision)
-        all_metrics['retrieval_recall'].append(recall)
-        all_metrics['retrieval_f1'].append(f1)
+    paper['evaluation'] = evaluation
+    return paper, evaluation
 
-        bleu, rouge_scores, text_f1 = calculate_text_similarity_metrics(
-            paper.get('text', ''),
-            paper.get('pipeline_answer', '')
-        )
-        all_metrics['bleu'].append(bleu)
-        all_metrics['rouge_1'].append(rouge_scores['rouge-1']['f'])
-        all_metrics['rouge_2'].append(rouge_scores['rouge-2']['f'])
-        all_metrics['rouge_l'].append(rouge_scores['rouge-l']['f'])
-        all_metrics['text_f1'].append(text_f1)
+def evaluate_papers(papers_with_answers, retrieval_k):
+    """Evaluate papers and calculate metrics in parallel."""
+    logger.info(f"Starting parallel evaluation of {len(papers_with_answers)} papers")
+    
+    # Create a partial function with fixed retrieval_k
+    evaluate_paper_partial = partial(evaluate_single_paper, retrieval_k=retrieval_k)
 
-        paper['evaluation'] = {
-            'retrieval_precision': precision, 'retrieval_recall': recall, 'retrieval_f1': f1,
-            'bleu': bleu, 'rouge_1': rouge_scores['rouge-1']['f'],
-            'rouge_2': rouge_scores['rouge-2']['f'], 'rouge_l': rouge_scores['rouge-l']['f'],
-            'text_f1': text_f1,
-            'num_source_papers': len(paper.get('pipeline_source_papers', []))  # Add this line
-        }
+    # Use multiprocessing to evaluate papers in parallel
+    with multiprocessing.Pool() as pool:
+        results = pool.map(evaluate_paper_partial, papers_with_answers)
 
-        wandb.log({f"{k}": v for k, v in paper['evaluation'].items()})
+    # Unpack results
+    evaluated_papers, all_evaluations = zip(*results)
+
+    # Calculate average metrics and log to wandb
+    all_metrics = {
+        f'precision@{retrieval_k}': [], f'recall@{retrieval_k}': [], f'f1@{retrieval_k}': [],
+        'rouge_1': [], 'rouge_2': [], 'rouge_l': [], 'text_f1': []
+    }
+
+    for evaluation in all_evaluations:
+        for key in all_metrics.keys():
+            all_metrics[key].append(evaluation[key])
+        # Log individual paper metrics to wandb
+        wandb.log({f"{k}": v for k, v in evaluation.items()})
 
     avg_metrics = {k: np.mean(v) for k, v in all_metrics.items()}
+    
+    # Log average metrics as summary metrics to wandb
+    for k, v in avg_metrics.items():
+        wandb.run.summary[f"avg_{k}"] = v
 
-    return papers_with_answers, avg_metrics
+    return list(evaluated_papers), avg_metrics
+
+def main():
+    # Example usage of calculate_retrieval_metrics
+    referenced_works = ['A', 'B', 'C', 'D']
+    pipeline_source_papers = ['B', 'C', 'E', 'F', 'A']
+    k = 3
+
+    precision, recall, f1 = calculate_retrieval_metrics(referenced_works, pipeline_source_papers, k)
+
+    print(f"Precision@{k}: {precision:.2f}")
+    print(f"Recall@{k}: {recall:.2f}")
+    print(f"F1@{k}: {f1:.2f}")
+
+if __name__ == "__main__":
+    main()

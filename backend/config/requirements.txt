@@ -12,4 +12,5 @@ tokenizers
 pypdf2
 nltk==3.9.1
 wandb
-rouge
+rouge-score
+scikit-learn

@@ -21,16 +21,15 @@ class QuestionGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     
 class PipelineConfig(BaseModel):
-    iterations: int = 5
+    iterations: int = 2
     num_queries: int = 2
     search_client: str = "openalex"
 
 class EvaluationConfig(BaseModel):
-    # eval_llm: str = "gpt-4o-2024-08-06"
-    eval_llm: str = "gpt-4o-mini"
+    retrieval_k: int = 10
 
 class BenchmarkConfig(BaseModel):
-    project_name: str = "ADE_ResearchArena"
+    project_name: str = "ADE_ResearchArena2"
     seed_papers: SeedPapersConfig = Field(default_factory=SeedPapersConfig)
     question_generation: QuestionGenerationConfig = Field(default_factory=QuestionGenerationConfig)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
@@ -39,6 +38,7 @@ class BenchmarkConfig(BaseModel):
     # system: str = "baseline_no_rag"
     system: str = "ade"
     # system: str = "baseline_naive_rag"
+    # system: str = "baseline_title"
 
 # Create a default configuration
 default_config = BenchmarkConfig()
