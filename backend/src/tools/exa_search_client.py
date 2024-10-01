@@ -92,6 +92,10 @@ class ExaSearchClient(SearchClient):
     def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, type: str = None, use_autoprompt: bool = None) -> dict:
         return super().search(query, main_question, start_published_date, end_published_date, type=type, use_autoprompt=use_autoprompt)
 
+    def _create_limited_meta(self, meta):
+        # For ExaSearchClient, we'll use the same limited_meta as the full meta
+        return meta.copy()
+
     def _filter_results(self, response):
         results = response.get('results', [])
         filtered_results = []
@@ -109,8 +113,41 @@ class ExaSearchClient(SearchClient):
             filtered_results.append(self._format_text_as_json(main_text, meta=meta))
 
         return filtered_results
-    
 
+    def search(self, query: str, main_question: str = None, start_published_date: str = None, end_published_date: str = None, type: str = None, use_autoprompt: bool = None) -> dict:
+        return super().search(query, main_question, start_published_date, end_published_date, type=type, use_autoprompt=use_autoprompt)
+
+    def _format_text_as_json(self, text, meta=None, num_tokens=None):
+        text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
+        unique_id = f"E{text_hash % 10**10:010d}"
+        
+        cleaned_meta = {k: v for k, v in (meta or {}).items() if v}
+        
+        if num_tokens is not None:
+            cleaned_meta['num_tokens'] = num_tokens
+        
+        # Create limited_meta (by default, same as full meta)
+        limited_meta = self._create_limited_meta(cleaned_meta)
+        
+        return {"id": unique_id, "meta": cleaned_meta, "limited_meta": limited_meta, "text": text}
+
+    def _process_result(self, result: Dict) -> List[Dict]:
+        meta = result.get("meta", {})
+        text = result.get("text", "")
+        
+        tokens = self._tokenize(text)
+        num_tokens = len(tokens)
+        
+        if not self.use_chunking or num_tokens <= self.max_document_size_tokens:
+            return [self._format_text_as_json(text, meta=meta, num_tokens=num_tokens)]
+        
+        if num_tokens <= self.chunk_size:
+            return [self._format_text_as_json(text, meta=meta, num_tokens=num_tokens)]
+        
+        chunked_results = self.chunker.chunk_text(text, meta)
+        return [self._format_text_as_json(chunk["text"], meta=chunk["meta"], num_tokens=chunk["num_tokens"]) for chunk in chunked_results]
+
+    # ... rest of the class ...
 
 # Exa example usage
 exa_search = ExaSearchClient(rerank=True, caching=False, 

@@ -269,17 +269,13 @@ class OpenAlexSearchClient(SearchClient):
             logger.warning(f"Error reconstructing abstract: {e}", exc_info=True)
             return ""
 
-    def _process_result(self, result: Dict) -> List[Dict]:
-        # logger.debug(f"Processing result: {json.dumps(result, indent=2)}")
-        processed = super()._process_result(result)
-        
-        # Update the URL in meta to the successful PDF URL if it exists
-        for item in processed:
-            if item['meta'].get('successful_pdf_url'):
-                item['meta']['url'] = item['meta']['successful_pdf_url']
-        
-        # logger.debug(f"Processed result: {json.dumps(processed, indent=2)}")
-        return processed
+    def _create_limited_meta(self, meta):
+        return {
+            'title': meta.get('title', ''),
+            'publication_date': meta.get('publication_date', ''),
+            'cited_by_count': meta.get('cited_by_count', 0),
+            'url': meta.get('successful_pdf_url') or meta.get('url', '')
+        }
     
     def _rerank_results(self, query: str, results: List[Dict], main_question: str = None) -> List[Dict]:
         if not results:

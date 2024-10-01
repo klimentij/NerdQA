@@ -41,11 +41,21 @@ class StatementGenerator:
         
         filtered_results = search_results.get('results', [])
 
+        # Use only limited_meta for each result
+        limited_results = [
+            {
+                "id": result.get("id"),
+                "meta": result.get("limited_meta", result.get("meta", {})),
+                "text": result.get("text", "")
+            }
+            for result in filtered_results
+        ]
+
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
                 "QUERY": current_query,
-                "SEARCH_RESULTS": json.dumps(filtered_results),
+                "SEARCH_RESULTS": json.dumps(limited_results),
                 "HISTORY": current_history
             },
             completion_kwargs={"metadata": metadata}
