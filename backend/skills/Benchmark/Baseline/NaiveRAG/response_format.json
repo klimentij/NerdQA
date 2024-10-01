@@ -1,0 +1,22 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "research_assistant_response",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A brief paragraph analyzing the provided information, considering key relevant information, relation to the main question, and any gaps or limitations in the available information."
+        },
+        "answer": {
+          "type": "string",
+          "description": "A comprehensive, long-form answer to the main question. The answer should be directly supported by evidence, thoroughly address all aspects of the question, be detailed and extensive, use language that reflects certainty or uncertainty, and include inline references to evidence IDs (E...) in square brackets for each sentence."
+        }
+      },
+      "required": ["reflection", "answer"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

@@ -1,0 +1,18 @@
+caching: true
+
+completion_kwargs:
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_tokens: 4000
+
+
+trims:
+  - name: 'SEARCH_RESULTS'
+    trim_type: 'END'
+    min_length: 10000
+    max_length: 40000
+
+  - name: 'MAIN_QUESTION'
+    trim_type: 'END'
+    min_length: 10000
+    max_length: 20000

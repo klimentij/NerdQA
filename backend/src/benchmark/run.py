@@ -5,16 +5,21 @@ import json
 import time
 import wandb
 from typing import Dict, Any, List
-from pathlib import Path
+from pydantic import BaseModel
+from nltk.tokenize import word_tokenize
+from nltk.translate.bleu_score import sentence_bleu
+from rouge import Rouge
+import numpy as np
+import re
 
 from backend.src.benchmark.steps.seed_papers import fetch_and_process_papers
 from backend.src.benchmark.steps.build_questions import generate_questions
 from backend.src.benchmark.steps.eval_ade import evaluate_answer, create_metadata
-from backend.src.benchmark.steps.run_pipeline import run_pipeline_request
+from backend.src.benchmark.steps.run_pipeline import run_pipeline_request, run_pipeline_for_paper
 from backend.src.llm.completion import Completion
 from backend.src.benchmark.config import load_config, BenchmarkConfig
 from backend.src.util.setup_logging import setup_logging
-from backend.src.benchmark.steps.baselines.no_rag import generate_no_rag_answer
+from backend.src.benchmark.steps.eval_ade import evaluate_papers
 
 logger = setup_logging(__name__)
 
@@ -35,22 +40,30 @@ def log_completion_skill_config(skill: Completion):
     
     wandb.log_artifact(artifact)
 
-async def run_pipeline_for_paper(paper: Dict[str, Any], config: BenchmarkConfig, metadata: Dict[str, str]) -> Dict[str, Any]:
-    if config.system == "ade":
-        answer, citation_tree = await run_pipeline_request(paper, config.pipeline)
-        paper['pipeline_answer'] = answer
-        paper['pipeline_references'] = citation_tree
-    elif config.system == "baseline_no_rag":
-        answer = await generate_no_rag_answer(paper["question_generated"], metadata)
-        paper['pipeline_answer'] = answer
-        paper['pipeline_references'] = []  # No references for baseline
-    else:
-        raise ValueError(f"Unknown system: {config.system}")
-    return paper
+def flatten_config(config: BenchmarkConfig) -> dict:
+    """Flatten the config object into a dictionary with dot notation keys."""
+    flat_config = {}
+    
+    def flatten(obj, prefix=''):
+        if isinstance(obj, BaseModel):
+            for field, value in obj:
+                flatten(value, f"{prefix}{field}.")
+        elif isinstance(obj, (list, tuple)):
+            for i, value in enumerate(obj):
+                flatten(value, f"{prefix}{i}.")
+        else:
+            flat_config[prefix[:-1]] = obj
+
+    flatten(config)
+    return flat_config
 
 async def run_benchmark(config: BenchmarkConfig):
     """Run the entire benchmark process."""
-    wandb.init(project=config.project_name, config=config)
+    # Flatten the config
+    flat_config = flatten_config(config)
+    
+    # Initialize wandb with flattened config
+    wandb.init(project=config.project_name, config=flat_config)
 
     question_skill = Completion(('Benchmark', 'Question'))
     log_completion_skill_config(question_skill)
@@ -71,15 +84,29 @@ async def run_benchmark(config: BenchmarkConfig):
     tasks = [run_pipeline_for_paper(paper, config, metadata) for paper in papers_with_questions]
     papers_with_answers = await asyncio.gather(*tasks)
 
+    # Evaluate results
+    papers_with_answers, avg_metrics = evaluate_papers(papers_with_answers)
+
+    # Log average metrics to wandb summary
+    for k, v in avg_metrics.items():
+        wandb.run.summary[f"avg_{k}"] = v
+
+    # Prepare the final output dictionary
+    final_output = {
+        "average_metrics": avg_metrics,
+        "papers": papers_with_answers
+    }
+
     # Save results to last_run.json
     runs_dir = os.path.join(os.path.dirname(__file__), "runs")
     os.makedirs(runs_dir, exist_ok=True)
     static_output_file = os.path.join(runs_dir, "last_run.json")
     with open(static_output_file, 'w') as f:
-        json.dump(papers_with_answers, f, indent=2)
+        json.dump(final_output, f, indent=2)
 
     logger.info(f"Results saved to {static_output_file}")
     wandb.finish()
+
 
 if __name__ == "__main__":
     config = load_config()

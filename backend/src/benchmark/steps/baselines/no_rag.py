@@ -1,10 +1,9 @@
 import asyncio
 from backend.src.llm.completion import Completion
-from backend.src.benchmark.config import BenchmarkConfig
 from typing import Dict, Any
 
 async def generate_no_rag_answer(question: str, metadata: Dict[str, str]) -> str:
-    skill = Completion(('BenchPaperCompress', 'Baseline', 'NoRAGAnswer'))
+    skill = Completion(('Benchmark', 'Baseline', 'NoRAGAnswer'))
     
     result = await asyncio.to_thread(skill.complete,
         prompt_inputs={"MAIN_QUESTION": question},
@@ -14,7 +13,6 @@ async def generate_no_rag_answer(question: str, metadata: Dict[str, str]) -> str
     )
     
     return result.content
-
 
 async def main():
     question = "What is the capital of France?"

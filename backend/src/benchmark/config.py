@@ -23,8 +23,8 @@ class QuestionGenerationConfig(BaseModel):
     chunk_overlap: int = 0
 
 class PipelineConfig(BaseModel):
-    iterations: int = 1
-    num_queries: int = 1
+    iterations: int = 2
+    num_queries: int = 2
     search_client: str = "openalex"
 
 class EvaluationConfig(BaseModel):
@@ -32,14 +32,15 @@ class EvaluationConfig(BaseModel):
     eval_llm: str = "gpt-4o-mini"
 
 class BenchmarkConfig(BaseModel):
-    project_name: str = "ADE"
+    project_name: str = "ADE_ResearchArena"
     seed_papers: SeedPapersConfig = Field(default_factory=SeedPapersConfig)
     question_generation: QuestionGenerationConfig = Field(default_factory=QuestionGenerationConfig)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: str = "benchmark/runs"
     # system: str = "baseline_no_rag"
-    system: str = "ade"
+    # system: str = "ade"
+    system: str = "baseline_naive_rag"
 
 # Create a default configuration
 default_config = BenchmarkConfig()
