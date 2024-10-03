@@ -36,9 +36,11 @@ class QuestionGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     
 class PipelineConfig(BaseModel):
-    iterations: int = 15
+    iterations: int = 5
     num_queries: int = 2
     search_client: str = "openalex"
+    download_full_text: bool = False
+    search_caching: bool = True
 
 class EvaluationConfig(BaseModel):
     retrieval_k: int = 10
@@ -55,7 +57,8 @@ class BenchmarkConfig(BaseModel):
             # "baseline_no_rag", 
             # "baseline_title", 
             # "baseline_naive_rag",
-            "ade"
+            # "ade"
+            "qnote"
         ]
     )
 # Create a default configuration

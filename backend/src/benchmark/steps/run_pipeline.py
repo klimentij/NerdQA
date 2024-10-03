@@ -9,6 +9,7 @@ from backend.src.benchmark.config import PipelineConfig, BenchmarkConfig
 from backend.src.benchmark.steps.baselines.no_rag import generate_no_rag_answer
 from backend.src.benchmark.steps.baselines.naive_rag import generate_naive_rag_answer
 from backend.src.benchmark.steps.baselines.title import title_search
+from backend.src.qnote.pipeline import run_pipeline as qnote_run_pipeline
 
 logger = setup_logging(__file__, log_level="DEBUG")
 
@@ -97,6 +98,20 @@ async def run_pipeline_for_paper(paper: Dict[str, Any], config: BenchmarkConfig,
         paper['pipeline_answer'] = answer
         paper['pipeline_references'] = citation_tree
         paper['pipeline_source_papers'] = list(set(collect_openalex_ids(citation_tree)))
+    elif config.system == "qnote":
+        result = await qnote_run_pipeline(
+            main_question=paper["question_generated"],
+            iterations=config.pipeline.iterations,
+            num_queries=config.pipeline.num_queries,
+            start_date=None,  # Adjust if needed
+            end_date=(datetime.strptime(paper["publication_date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"),
+            download_full_text=config.pipeline.download_full_text,
+            search_caching=config.pipeline.search_caching
+        )   
+        paper['pipeline_answer'] = result['answer']
+        paper['pipeline_references'] = result['citation_tree']
+        paper['pipeline_source_papers'] = result['all_relevant_source_ids']
+        # You can add more fields from the result if needed
     elif config.system == "baseline_no_rag":
         answer = await generate_no_rag_answer(paper["question_generated"], metadata)
         paper['pipeline_answer'] = answer

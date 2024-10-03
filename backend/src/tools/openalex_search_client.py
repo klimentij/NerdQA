@@ -25,10 +25,11 @@ from src.tools.search_client import SearchClient, get_common_headers
 class OpenAlexSearchClient(SearchClient):
     def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, 
                  max_concurrent_downloads: int = 50, url_list_retry_rounds: int = 1, use_pdf_cache: bool = True, 
-                 downloader=None, use_chunking: bool = True, **kwargs):  # Add use_chunking parameter
+                 downloader=None, use_chunking: bool = True, download_full_text: bool = True, **kwargs):
         super().__init__(reranking_threshold=reranking_threshold, max_concurrent_downloads=max_concurrent_downloads, 
                          url_list_retry_rounds=url_list_retry_rounds, use_pdf_cache=use_pdf_cache, 
-                         downloader=downloader, use_chunking=use_chunking, **kwargs)  # Pass use_chunking to super().__init__
+                         downloader=downloader, use_chunking=use_chunking, **kwargs)
+        self.download_full_text = download_full_text
         self.base_url = "https://api.openalex.org/works"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")
         if not self.api_key:
@@ -143,10 +144,12 @@ class OpenAlexSearchClient(SearchClient):
 
         logger.debug(f"Total time for all OpenAlex retrieval requests: {total_retrieval_time:.2f} seconds")
 
-        # Use the downloader to process paper downloads
-        logger.debug(f"Processing {len(results)} papers for download")
-        results = await self.process_papers(results[:self.initial_top_to_retrieve])
-        logger.debug(f"Processed {len(results)} papers after download")
+        if self.download_full_text:
+            logger.debug(f"Processing {len(results)} papers for download")
+            results = await self.process_papers(results[:self.initial_top_to_retrieve])
+            logger.debug(f"Processed {len(results)} papers after download")
+        else:
+            logger.debug("Skipping full text download as per configuration")
 
         processed_results = []
         for result in results:
@@ -154,9 +157,12 @@ class OpenAlexSearchClient(SearchClient):
 
         logger.debug(f"Processed {len(processed_results)} results before reranking")
 
-        reranked_results = self._rerank_results(query, processed_results, main_question)
-
-        logger.debug(f"Reranked {len(reranked_results)} results")
+        if self.rerank:
+            reranked_results = self._rerank_results(query, processed_results, main_question)
+            logger.debug(f"Reranked {len(reranked_results)} results")
+        else:
+            reranked_results = processed_results
+            logger.debug("Skipping reranking as per configuration")
 
         result = {"results": reranked_results, "total_count": total_count}
 
@@ -302,7 +308,8 @@ openalex_search = OpenAlexSearchClient(rerank=False,
                                        initial_top_to_retrieve=100,
                                        chunk_size=1024,
                                        max_concurrent_downloads=100,
-                                       use_chunking=False)  # Add this parameter
+                                       use_chunking=False,
+                                       download_full_text=True)  # Add this parameter
 async def main():
 	queries = [
         "Large language models"

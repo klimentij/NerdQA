@@ -150,8 +150,11 @@ class AnswerGenerator:
             logger.error(f"Error in generate_answer: {e}")
             return ""
 
-async def run_pipeline(main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str):
-    web_search = OpenAlexSearchClient()
+async def run_pipeline(main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, download_full_text: bool, search_caching: bool):
+    web_search = OpenAlexSearchClient(
+        download_full_text=download_full_text,
+        caching=search_caching
+    )
     statement_generator = StatementGenerator(web_search=web_search)
     query_generator = QueryGenerator()
     answer_generator = AnswerGenerator()
@@ -207,6 +210,7 @@ async def run_pipeline(main_question: str, iterations: int, num_queries: int, st
         search_tasks = [statement_generator.search(query, main_question, start_date, end_date) 
                         for query in iteration_data["queries"]]
         search_results = await asyncio.gather(*search_tasks)
+        # logger.debug(f"Search results: {json.dumps(search_results, indent=2)}")
 
         # Merge and deduplicate search results
         merged_results = []
@@ -260,7 +264,7 @@ async def run_pipeline(main_question: str, iterations: int, num_queries: int, st
     # Add answer_openalex_ids to all_relevant_source_ids
     all_relevant_source_ids.update(answer_openalex_ids)
 
-    return {
+    result = {
         "answer": answer,
         "citation_tree": citation_tree,
         "answer_source_ids": answer_source_ids,
@@ -270,6 +274,14 @@ async def run_pipeline(main_question: str, iterations: int, num_queries: int, st
         "all_statements": all_statements,
         "all_evidence": all_evidence
     }
+
+    # Create a copy of the result without search_results for logging
+    log_result = result.copy()
+    for iteration in log_result['history']:
+        iteration.pop('search_results', None)
+
+    logger.debug(f"Pipeline result: {json.dumps(log_result, indent=2)}")
+    return result
 
 def extract_citation_info(answer, all_statements, all_evidence):
     cited_statements = set(re.findall(r'\[(S\d+)\]', answer))
@@ -349,7 +361,7 @@ def get_history_string(history_list, include_answer=None):
             "iteration": item["iteration"],
             "query_reflection": item.get("query_reflection", ""),
             "queries": item.get("queries", []),
-            "statement_reflection": item.get("reflection", ""),  # Use "reflection" but name it "statement_reflection" in history
+            "statement_reflection": item.get("statement_reflection", ""),
             "statements": [
                 {
                     "id": stmt["id"],
@@ -357,7 +369,6 @@ def get_history_string(history_list, include_answer=None):
                 }
                 for stmt in item.get("statements", [])
             ],
-            "relevant_source_ids": item.get("relevant_source_ids", [])
         }
         simplified_history.append(simplified_item)
     
