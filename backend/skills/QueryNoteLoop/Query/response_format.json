@@ -1,0 +1,29 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "next_query_generation",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "progress_assessment": {
+          "type": "string",
+          "description": "A brief assessment of the current research progress"
+        },
+        "strategy": {
+          "type": "string",
+          "description": "The chosen strategy for the next queries, explaining how it addresses the current state of research"
+        },
+        "next_queries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The queries for the research process are concise and suitable for a search engine. The number of queries must be exactly the one that is specified in the 'Number of Queries to Generate' section. Could be 1 or more."
+        }
+      },
+      "required": ["progress_assessment", "strategy", "next_queries"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}

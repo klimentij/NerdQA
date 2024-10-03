@@ -36,7 +36,7 @@ class QuestionGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     
 class PipelineConfig(BaseModel):
-    iterations: int = 20
+    iterations: int = 15
     num_queries: int = 2
     search_client: str = "openalex"
 
