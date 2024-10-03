@@ -5,23 +5,19 @@
     "schema": {
       "type": "object",
       "properties": {
-        "progress_assessment": {
+        "reflection": {
           "type": "string",
-          "description": "A brief assessment of the current research progress"
+          "description": "A summary of the current state of research and suggested direction for the next step"
         },
-        "strategy": {
-          "type": "string",
-          "description": "The chosen strategy for the next queries, explaining how it addresses the current state of research"
-        },
-        "next_queries": {
+        "queries": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "The queries for the research process are concise and suitable for a search engine. The number of queries must be exactly the one that is specified in the 'Number of Queries to Generate' section. Could be 1 or more."
+          "description": "New, concise queries for a Google-like search engine, targeting the same search intent but phrased with maximum linguistic diversity. The number of queries must be exactly as specified in the 'Number of Queries to Generate' section."
         }
       },
-      "required": ["progress_assessment", "strategy", "next_queries"],
+      "required": ["reflection", "queries"],
       "additionalProperties": false
     },
     "strict": true

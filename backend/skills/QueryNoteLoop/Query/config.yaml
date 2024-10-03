@@ -10,8 +10,8 @@ completion_kwargs:
 
 
 trims:
-  - name: 'PREVIOUS_QUERIES_AND_STATEMENTS'
-    trim_type: 'END'
+  - name: 'RESEARCH_HISTORY'
+    trim_type: 'START'
     min_length: 10000
     max_length: 80000
 
