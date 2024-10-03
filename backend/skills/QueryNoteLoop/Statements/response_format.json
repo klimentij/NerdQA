@@ -1,0 +1,40 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "statement_generation",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "reflection": {
+          "type": "string",
+          "description": "A paragraph containing reflection on the main research question, current question, search results, and previously made statements. Include analysis of relevance, key information, gaps, contradictions, and factual content. Explain the novelty of statements to be made or why no new statements can be made."
+        },
+        "statements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The statement text, formulated as a clear, concise claim that directly reflects the evidence and provides new information. IMPORTANT: Do not repeat or rephrase existing statements. Each statement must contain significant new information not present in any previous statement."
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "A list of evidence IDs that directly support the statement. Must include both search result evidence (E.. ids) and previous statement evidence (S.. ids) where applicable."
+              }
+            },
+            "required": ["text", "evidence"],
+            "additionalProperties": false
+          },
+          "description": "An array of generated statements with their supporting evidence. Include only statements that are directly supported by the evidence, relevant to the current question, and provide new information. The array may be empty if no new statements can be made."
+        }
+      },
+      "required": ["reflection", "statements"],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+}
