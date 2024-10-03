@@ -98,11 +98,16 @@ class StatementGenerator:
             return StatementsOutput(reflection="", statements=[], relevant_sources=[])
 
 class QueryGenerator:
-    def __init__(self):
+    def __init__(self, query_llm: str = None):
         self.skill = Completion(('QueryNoteLoop', 'Query'))
+        self.query_llm = query_llm
 
     def generate_next_queries(self, main_question: str, research_history: str, num_queries: int, metadata: dict) -> QueryOutput:
         logger.info(f"Generating next {num_queries} queries")
+        
+        completion_kwargs={"metadata": metadata}
+        if self.query_llm:
+            completion_kwargs["model"] = self.query_llm
         
         result = self.skill.complete(
             prompt_inputs={
@@ -110,7 +115,7 @@ class QueryGenerator:
                 "RESEARCH_HISTORY": research_history,
                 "NUM_QUERIES": num_queries
             },
-            completion_kwargs={"metadata": metadata}
+            completion_kwargs=completion_kwargs
         )
 
         try:
@@ -150,13 +155,14 @@ class AnswerGenerator:
             logger.error(f"Error in generate_answer: {e}")
             return ""
 
-async def run_pipeline(main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, download_full_text: bool, search_caching: bool):
+async def run_pipeline(main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, download_full_text: bool, search_caching: bool, query_llm: str, initial_top_to_retrieve: int):
     web_search = OpenAlexSearchClient(
         download_full_text=download_full_text,
-        caching=search_caching
+        caching=search_caching,
+        initial_top_to_retrieve=initial_top_to_retrieve
     )
     statement_generator = StatementGenerator(web_search=web_search)
-    query_generator = QueryGenerator()
+    query_generator = QueryGenerator(query_llm=query_llm)
     answer_generator = AnswerGenerator()
     
     history_list = []

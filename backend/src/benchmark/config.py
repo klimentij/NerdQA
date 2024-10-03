@@ -36,11 +36,13 @@ class QuestionGenerationConfig(BaseModel):
     max_papers_to_process: int = 5
     
 class PipelineConfig(BaseModel):
-    iterations: int = 5
+    iterations: int = 3
     num_queries: int = 2
     search_client: str = "openalex"
     download_full_text: bool = False
     search_caching: bool = True
+    query_llm: str = "gpt-4o-2024-08-06"
+    initial_top_to_retrieve: int = 200
 
 class EvaluationConfig(BaseModel):
     retrieval_k: int = 10

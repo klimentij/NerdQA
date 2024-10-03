@@ -106,7 +106,9 @@ async def run_pipeline_for_paper(paper: Dict[str, Any], config: BenchmarkConfig,
             start_date=None,  # Adjust if needed
             end_date=(datetime.strptime(paper["publication_date"], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"),
             download_full_text=config.pipeline.download_full_text,
-            search_caching=config.pipeline.search_caching
+            search_caching=config.pipeline.search_caching,
+            query_llm=config.pipeline.query_llm,
+            initial_top_to_retrieve=config.pipeline.initial_top_to_retrieve
         )   
         paper['pipeline_answer'] = result['answer']
         paper['pipeline_references'] = result['citation_tree']

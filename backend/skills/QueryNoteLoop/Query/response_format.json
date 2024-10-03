@@ -7,14 +7,14 @@
       "properties": {
         "reflection": {
           "type": "string",
-          "description": "A summary of the current state of research and suggested direction for the next step"
+          "description": "A summary of the current state of research, identified knowledge gaps, and suggested direction for the next step, emphasizing the need for exploring new research paths"
         },
         "queries": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "New, concise queries for a Google-like search engine, targeting the same search intent but phrased with maximum linguistic diversity. The number of queries must be exactly as specified in the 'Number of Queries to Generate' section."
+          "description": "New, concise queries for a Google-like search engine, targeting the same search intent but phrased with maximum linguistic diversity. These queries MUST be entirely different from previous iterations, aiming to discover completely new research paths. The number of queries must be exactly as specified in the 'Number of Queries to Generate' section."
         }
       },
       "required": ["reflection", "queries"],
