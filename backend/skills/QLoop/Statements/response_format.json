@@ -7,7 +7,7 @@
       "properties": {
         "reflection": {
           "type": "string",
-          "description": "A paragraph containing reflection on the main research question, current question, search results, and previously made statements. Include analysis of relevance, key information, gaps, contradictions, and factual content. Explain the novelty of statements to be made or why no new statements can be made."
+          "description": "A comprehensive paragraph containing strategic reflection on the main research question, current question, search results, and previously made statements. Include analysis of relevance, key information, gaps, contradictions, and factual content. Explore emerging patterns, themes, or connections across gathered information. Discuss potential challenges in generating statements and strategies for effective information synthesis. Explain the novelty of statements to be made or why no new statements can be made."
         },
         "statements": {
           "type": "array",
@@ -16,20 +16,20 @@
             "properties": {
               "text": {
                 "type": "string",
-                "description": "The statement text, formulated as a clear, concise claim that directly reflects the evidence and provides new information. IMPORTANT: Do not repeat or rephrase existing statements. Each statement must contain significant new information not present in any previous statement."
+                "description": "A comprehensive, evidence-based statement that directly reflects the evidence and provides significant new information. Each statement must be highly detailed, including precise data points, benchmark results, performance metrics, and all relevant numerical data. Synthesize information from multiple sources, present a balanced perspective, include methodological details, and highlight current challenges and limitations. Ensure the statement relates back to the main research question and addresses the current question. Use language that accurately reflects the certainty or uncertainty in the source material. CRITICAL: Do not repeat or rephrase existing statements. Each statement must contain substantial new information not present in any previous statement or the research history."
               },
               "evidence": {
                 "type": "array",
                 "items": {
                   "type": "string"
                 },
-                "description": "A list of evidence IDs that directly support the statement. Must include both search result evidence (E.. ids) and previous statement evidence (S.. ids) where applicable."
+                "description": "A list of evidence IDs that directly support the statement. Must include both search result evidence (E.. ids) and previous statement evidence (S.. ids) where applicable. Ensure all information in the statement is supported by these evidence IDs."
               }
             },
             "required": ["text", "evidence"],
             "additionalProperties": false
           },
-          "description": "An array of generated statements with their supporting evidence. Include only statements that are directly supported by the evidence, relevant to the current question, and provide new information. The array may be empty if no new statements can be made."
+          "description": "An array of generated statements with their supporting evidence. Include only statements that are directly supported by the evidence, relevant to the current question, and provide substantial new information. Statements should be comprehensive, containing ALL details necessary to write the final paper, including every single fact, figure, and data point that might be relevant. The array may be empty if no new statements can be made based on the current context."
         }
       },
       "required": ["reflection", "statements"],
