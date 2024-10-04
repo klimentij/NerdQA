@@ -427,6 +427,42 @@ def generate_full_citation_tree(all_statements, all_evidence, cited_statements, 
 
     return trees
 
+@app.get("/citation/{session_id}/{citation_id}")
+async def get_citation(session_id: str, citation_id: str):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[session_id]
+    orchestrator = session["orchestrator"]
+    
+    if citation_id.startswith('S'):
+        # Look for the statement in all_statements
+        for iteration in session["messages"]:
+            if iteration["type"] == "statements":
+                for statement in iteration["data"]:
+                    if statement["id"] == citation_id:
+                        return statement
+    elif citation_id.startswith('E'):
+        # Look for the evidence in all_evidence
+        for iteration in session["messages"]:
+            if iteration["type"] == "answer":
+                full_citation_tree = iteration.get("full_citation_tree", {})
+                for tree in full_citation_tree.values():
+                    evidence = find_evidence_in_tree(tree, citation_id)
+                    if evidence:
+                        return evidence
+
+    raise HTTPException(status_code=404, detail="Citation not found")
+
+def find_evidence_in_tree(node, target_id):
+    if node["id"] == target_id:
+        return node
+    for child in node.get("children", []):
+        result = find_evidence_in_tree(child, target_id)
+        if result:
+            return result
+    return None
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

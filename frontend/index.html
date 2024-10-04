@@ -699,10 +699,8 @@
 
             // Then, process citations
             html = html.replace(/\[(S\d+|E\d+)\]/g, (match, id) => {
-                if (allStatements[id] || allEvidence[id]) {
-                    return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
-                }
-                return match;
+                // Always create a link and citation tree container, even if data is not available
+                return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
             });
 
             return `<div class="processed-answer">${html}</div>`;
@@ -752,9 +750,10 @@
 
             // Add event listeners for citations and hide buttons
             document.querySelectorAll('.citation').forEach(citation => {
-                citation.addEventListener('click', (e) => {
+                citation.addEventListener('click', async (e) => {
                     e.preventDefault();
-                    const treeId = `tree-${e.target.dataset.id}`;
+                    const id = e.target.dataset.id;
+                    const treeId = `tree-${id}`;
                     const tree = document.getElementById(treeId);
                     
                     if (tree) {
@@ -764,6 +763,25 @@
                         }
                         
                         if (tree.classList.contains('hidden')) {
+                            // If the tree is empty, fetch the data and render it
+                            if (!tree.innerHTML.trim()) {
+                                const data = allStatements[id] || allEvidence[id] || await fetchMissingCitationData(id);
+                                if (data) {
+                                    const treeHtml = renderCitationTree({ id, text: data.text, children: data.evidence || [] });
+                                    tree.innerHTML = `
+                                        <div class="tree-content">
+                                            <button class="hide-tree">Hide</button>
+                                            <h3>Citation Tree for ${id}</h3>
+                                            <ul>${treeHtml}</ul>
+                                        </div>
+                                    `;
+                                    // Add event listener for the new hide button
+                                    tree.querySelector('.hide-tree').addEventListener('click', () => {
+                                        tree.classList.add('hidden');
+                                        currentOpenTreeId = null;
+                                    });
+                                }
+                            }
                             // Open the clicked tree
                             tree.classList.remove('hidden');
                             currentOpenTreeId = treeId;
@@ -875,6 +893,25 @@
                     Preparing the initial report draft...
                 </h3>
             `;
+        }
+
+        async function fetchMissingCitationData(id) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/citation/${currentSessionId}/${id}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch citation data for ${id}`);
+                }
+                const data = await response.json();
+                if (id.startsWith('S')) {
+                    allStatements[id] = data;
+                } else if (id.startsWith('E')) {
+                    allEvidence[id] = data;
+                }
+                return data;
+            } catch (error) {
+                console.error('Error fetching citation data:', error);
+                return null;
+            }
         }
     </script>
 </body>
