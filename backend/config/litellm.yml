@@ -3,7 +3,7 @@ model_list:
     litellm_params:
       model: gpt-4o-2024-08-06
       api_key: "os.environ/OPENAI_API_KEY"
-      rpm: 10
+      rpm: 100
   - model_name: gpt-4o-2024-05-13
     litellm_params:
       model: gpt-4o-2024-05-13

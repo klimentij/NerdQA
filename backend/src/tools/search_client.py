@@ -111,7 +111,7 @@ class SearchClient(ABC):
         if self.cache:
             cached_response = self.cache.get(cache_key)
             if cached_response is not None:
-                logger.debug(f"Returning cached results: {json.dumps(cached_response, indent=2)}")
+                # logger.debug(f"Returning cached results: {json.dumps(cached_response, indent=2)}")
                 return cached_response
         
         try:
