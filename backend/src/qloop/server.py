@@ -117,12 +117,12 @@ class PipelineOrchestrator:
         
         return statements, search_results
 
-    async def generate_next_queries(self, main_question: str, current_best_answer: str, num_queries: int, iteration: int, start_date: str, end_date: str):
+    async def generate_next_queries(self, main_question: str, num_queries: int, iteration: int):
         logger.info(f"Generating queries with current history: {self.current_history}")
         metadata = self.get_metadata(iteration)
         next_queries = await asyncio.to_thread(
             self.query_generator.generate_next_queries,
-            main_question, self.current_history, current_best_answer, num_queries, metadata
+            main_question, self.current_history, num_queries, metadata
         )
         return next_queries
 
@@ -231,8 +231,8 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
             next_queries = [main_question]
         else:
             next_queries = await orchestrator.generate_next_queries(
-                main_question, "", num_queries, iteration, start_date, end_date
-            )
+            main_question, num_queries, iteration
+        )
 
         new_message = {
             "type": "queries",

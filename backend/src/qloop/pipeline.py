@@ -83,16 +83,15 @@ class StatementGenerator:
 
 class QueryGenerator:
     def __init__(self):
-        self.skill = Completion(('QLoop', 'Query'))
+        self.skill = Completion(('QueryNoteLoop', 'Query'))
 
-    def generate_next_queries(self, main_question: str, history: str, current_best_answer: str, num_queries: int, metadata: dict) -> List[str]:
+    def generate_next_queries(self, main_question: str, history: str, num_queries: int, metadata: dict) -> List[str]:
         logger.info(f"Generating next {num_queries} queries")
         
         result = self.skill.complete(
             prompt_inputs={
                 "MAIN_QUESTION": main_question,
-                "HISTORY": history,
-                "CURRENT_BEST_ANSWER": current_best_answer,
+                "RESEARCH_HISTORY": history,
                 "NUM_QUERIES": num_queries
             },
             completion_kwargs={"metadata": metadata}
@@ -100,8 +99,10 @@ class QueryGenerator:
 
         try:
             response_data = json.loads(result.content)
-            next_queries = response_data['next_queries']
+            reflection = response_data['reflection']
+            next_queries = response_data['queries']
             logger.info(f"Generated {len(next_queries)} next queries")
+            logger.info(f"Reflection: {reflection}")
             return next_queries
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
@@ -184,11 +185,11 @@ class Pipeline:
             # Generate queries (for the first iteration or using previous data)
             if iteration == 0:
                 current_queries = self.query_generator.generate_next_queries(
-                    main_question, "", "", num_queries, metadata
+                    main_question, "", num_queries, metadata
                 )
             else:
                 current_queries = self.query_generator.generate_next_queries(
-                    main_question, history, self.latest_answer, num_queries, metadata
+                    main_question, history, num_queries, metadata
                 )
 
             new_evidence_found = 0
