@@ -437,13 +437,28 @@
         const endDateInput = document.getElementById('endDateInput');
 
         let currentSessionId = null;
-        let pollingInterval = null;
         let currentIteration = 0;
         let allStatements = {};
         let allEvidence = {};
         let currentOpenTreeId = null;
+        let allEvents = [];
 
         const API_BASE_URL = 'http://localhost:8000';
+
+        let socket;
+
+        function connectWebSocket(sessionId) {
+            socket = new WebSocket(`ws://localhost:8000/ws/${sessionId}`);
+            
+            socket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                handlePipelineUpdate(message);
+            };
+
+            socket.onclose = function(event) {
+                console.log("WebSocket connection closed");
+            };
+        }
 
         async function startPipeline(question, iterations, numQueries, startDate, endDate) {
             try {
@@ -468,60 +483,38 @@
 
                 const data = await response.json();
                 currentSessionId = data.session_id;
-                startPolling();
+                connectWebSocket(currentSessionId);
             } catch (error) {
                 console.error('Error starting pipeline:', error);
                 alert('Failed to start the research process. Please try again.');
             }
         }
 
-        function startPolling() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
-            pollingInterval = setInterval(pollPipelineStatus, 2000);
-        }
-
-        async function pollPipelineStatus() {
-            if (!currentSessionId) return;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/pipeline_status/${currentSessionId}`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch pipeline status');
-                }
-
-                const data = await response.json();
-                handlePipelineUpdate(data);
-
-                if (data.status === 'completed') {
-                    clearInterval(pollingInterval);
-                }
-            } catch (error) {
-                console.error('Error polling pipeline status:', error);
-            }
-        }
-
         function handlePipelineUpdate(data) {
-            if (data.messages) {
-                data.messages.forEach(message => {
-                    switch (message.type) {
-                        case 'queries':
-                            displayQueries(message.data, message.iteration);
-                            break;
-                        case 'statements':
-                            displayStatements(message.data, message.iteration);
-                            break;
-                        case 'answer':
-                            displayAnswer(message.data, message.iteration, message.summary, message.full_citation_tree);
-                            break;
-                    }
-                });
+            if (data.type === "status" && data.data === "completed") {
+                // Handle completion
+            } else {
+                renderNewEvents([data]);
             }
+        }
 
-            if (data.status === 'completed') {
-                displayFinalAnswer(data.final_answer, data.full_citation_tree, data.summary);
-            }
+        function renderNewEvents(newEvents) {
+            let newEventsHtml = '';
+            newEvents.forEach(message => {
+                switch (message.type) {
+                    case 'queries':
+                        newEventsHtml += displayQueries(message.data, message.iteration);
+                        break;
+                    case 'statements':
+                        newEventsHtml += displayStatements(message.data, message.iteration);
+                        break;
+                    case 'answer':
+                        newEventsHtml += displayAnswer(message.data, message.iteration, message.summary, message.full_citation_tree);
+                        break;
+                }
+            });
+            chatMessages.innerHTML += newEventsHtml;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         // Remove the sendFeedback function and its related event listener
@@ -545,7 +538,7 @@
 
         function displayQueries(queries, iteration) {
             const queriesHtml = queries.map((query, index) => `<p><strong>Query ${index + 1}:</strong> ${query}</p>`).join('');
-            appendToChat(`Iteration ${iteration} - Queries`, queriesHtml);
+            return `<div><h3>Iteration ${iteration} - Queries</h3>${queriesHtml}</div>`;
         }
 
         function displayStatements(statements, iteration) {
@@ -553,7 +546,7 @@
                 allStatements[stmt.id] = stmt;
             });
             const statementsHtml = statements.map(stmt => `<p><strong>Statement ${stmt.id}:</strong> ${stmt.text}</p>`).join('');
-            appendToChat(`Iteration ${iteration} - Statements`, statementsHtml);
+            return `<div><h3>Iteration ${iteration} - Statements</h3>${statementsHtml}</div>`;
         }
 
         function displayAnswer(answer, iteration, summary, fullCitationTree) {
@@ -606,19 +599,21 @@
                 }
             }
 
-            // Add summary to chat
+            // Return HTML for chat instead of appending
+            let chatHtml = '';
             if (summary) {
-                const summaryHtml = `
-                    <ul>
-                        <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
-                        <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
-                        <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
-                    </ul>
+                chatHtml = `
+                    <div>
+                        <h3>Iteration ${iteration} Summary</h3>
+                        <ul>
+                            <li>New evidence discovered: ${summary.new_evidence_found} of ${summary.total_evidence_found}</li>
+                            <li>New evidence incorporated: ${summary.new_evidence_used} of ${summary.total_evidence_used}</li>
+                            <li>New statements generated: ${summary.new_statements} of ${summary.total_statements}</li>
+                        </ul>
+                    </div>
                 `;
-                appendToChat(`Iteration ${iteration} Summary`, summaryHtml);
-            } else {
-                console.warn("Summary data is missing");
             }
+            return chatHtml;
         }
 
         function processAnswer(answer) {
@@ -748,7 +743,9 @@
         // });
 
         newButton.addEventListener('click', () => {
-            clearInterval(pollingInterval);
+            if (socket) {
+                socket.close();
+            }
             currentSessionId = null;
             currentIteration = 0;
             allStatements = {};

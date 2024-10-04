@@ -11,7 +11,7 @@ import os
 import random
 import sys
 from typing import List, Dict, Optional
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
@@ -47,6 +47,9 @@ app.add_middleware(
 
 # In-memory storage for session data
 sessions: Dict[str, Dict] = {}
+
+# Add this new dictionary to store WebSocket connections
+websocket_connections: Dict[str, WebSocket] = {}
 
 class QuestionRequest(BaseModel):
     question: str
@@ -198,11 +201,21 @@ async def send_feedback(request: FeedbackRequest):
     orchestrator.add_user_feedback(request.feedback)
     return {"message": "Feedback received"}
 
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    await websocket.accept()
+    websocket_connections[session_id] = websocket
+    try:
+        while True:
+            # Keep the connection open
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        del websocket_connections[session_id]
+
 async def run_pipeline(session_id: str, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
     session = sessions[session_id]
     orchestrator = session["orchestrator"]
     
-    # Update the StatementGenerator with the provided web_search client
     orchestrator.statement_generator = StatementGenerator(web_search=web_search)
 
     all_statements = {}
@@ -221,11 +234,13 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
                 main_question, "", num_queries, iteration, start_date, end_date
             )
 
-        session["messages"].append({
+        new_message = {
             "type": "queries",
             "data": next_queries[:num_queries],
             "iteration": iteration + 1
-        })
+        }
+        session["messages"].append(new_message)
+        await send_update(session_id, new_message)
 
         new_evidence_found = 0
         new_evidence_used = 0
@@ -269,12 +284,14 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
                         if evidence_data:
                             all_evidence[evidence] = evidence_data
 
-            session["messages"].append({
+            new_message = {
                 "type": "statements",
                 "data": statements,
                 "iteration": iteration + 1,
                 "query_index": query_index
-            })
+            }
+            session["messages"].append(new_message)
+            await send_update(session_id, new_message)
 
             orchestrator.current_history += f"\nQuery: {next_queries[query_index-1]}\n"
             for stmt in statements:
@@ -297,19 +314,29 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
             "total_statements": total_statements
         }
 
-        session["messages"].append({
+        new_message = {
             "type": "answer",
             "data": answer,
             "iteration": iteration + 1,
             "summary": iteration_summary,
             "full_citation_tree": full_citation_tree
-        })
+        }
+        session["messages"].append(new_message)
+        await send_update(session_id, new_message)
 
         session["final_answer"] = answer
         session["full_citation_tree"] = full_citation_tree
         session["summary"] = iteration_summary
 
     session["status"] = "completed"
+    await send_update(session_id, {"type": "status", "data": "completed"})
+
+async def send_update(session_id: str, message: dict):
+    if session_id in websocket_connections:
+        try:
+            await websocket_connections[session_id].send_json(message)
+        except WebSocketDisconnect:
+            del websocket_connections[session_id]
 
 def generate_citation_tree_data(all_statements, all_evidence, max_depth=5):
     def build_tree(node_id, depth=0, visited=None):
