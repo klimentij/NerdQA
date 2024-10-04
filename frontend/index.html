@@ -187,7 +187,7 @@
             border-radius: 5px;
         }
 
-        .citation-tree:not(.hidden) {
+        .citation-tree:not(.hidden):not(:empty) {
             display: block;
         }
 
@@ -733,7 +733,7 @@
         function updateCitationTrees(fullCitationTree) {
             Object.entries(fullCitationTree).forEach(([stmtId, tree]) => {
                 const treeContainer = document.getElementById(`tree-${stmtId}`);
-                if (treeContainer && tree.children.length > 0) {
+                if (treeContainer && tree.children && tree.children.length > 0) {
                     const treeHtml = renderCitationTree(tree);
                     treeContainer.innerHTML = `
                         <div class="tree-content">
@@ -742,6 +742,10 @@
                             <ul>${treeHtml}</ul>
                         </div>
                     `;
+                    treeContainer.classList.add('hidden');
+                } else if (treeContainer) {
+                    // If there's no content, ensure the container is empty and hidden
+                    treeContainer.innerHTML = '';
                     treeContainer.classList.add('hidden');
                 }
             });
