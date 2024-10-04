@@ -441,6 +441,7 @@
         let currentIteration = 0;
         let allStatements = {};
         let allEvidence = {};
+        let currentOpenTreeId = null;
 
         const API_BASE_URL = 'http://localhost:8000';
 
@@ -556,8 +557,11 @@
         }
 
         function displayAnswer(answer, iteration, summary, fullCitationTree) {
-            console.log("Updating report content with answer:", answer); // Debugging log
+            console.log("Updating report content with answer:", answer);
             currentIteration = iteration;
+            
+            // Remember the currently open tree
+            const openTreeId = currentOpenTreeId;
             
             // Update allEvidence with new evidence
             if (fullCitationTree && typeof fullCitationTree === 'object') {
@@ -592,6 +596,15 @@
             `;
 
             updateCitationTrees(fullCitationTree);
+            
+            // Restore the open tree if it still exists
+            if (openTreeId) {
+                const tree = document.getElementById(openTreeId);
+                if (tree) {
+                    tree.classList.remove('hidden');
+                    currentOpenTreeId = openTreeId;
+                }
+            }
 
             // Add summary to chat
             if (summary) {
@@ -657,7 +670,7 @@
                             <ul>${treeHtml}</ul>
                         </div>
                     `;
-                    treeContainer.classList.add('hidden'); // Start with all trees hidden
+                    treeContainer.classList.add('hidden');
                 }
             });
 
@@ -669,10 +682,20 @@
                     const tree = document.getElementById(treeId);
                     
                     if (tree) {
-                        if (tree.classList.contains('hidden')) {
-                            closeAllCitationTrees(); // Close all trees before toggling the clicked one
+                        if (currentOpenTreeId && currentOpenTreeId !== treeId) {
+                            // Close the currently open tree if it's different
+                            document.getElementById(currentOpenTreeId).classList.add('hidden');
                         }
-                        tree.classList.toggle('hidden');
+                        
+                        if (tree.classList.contains('hidden')) {
+                            // Open the clicked tree
+                            tree.classList.remove('hidden');
+                            currentOpenTreeId = treeId;
+                        } else {
+                            // Close the clicked tree if it was already open
+                            tree.classList.add('hidden');
+                            currentOpenTreeId = null;
+                        }
                     }
                 });
             });
@@ -680,6 +703,7 @@
             document.querySelectorAll('.hide-tree').forEach(button => {
                 button.addEventListener('click', (e) => {
                     e.target.closest('.citation-tree').classList.add('hidden');
+                    currentOpenTreeId = null;
                 });
             });
         }
