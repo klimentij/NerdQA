@@ -248,6 +248,7 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
         iteration_evidence_ids = set()
 
         async def process_query(query_index, current_query):
+            logger.debug(f"Processing query {query_index}: {current_query}")
             statements, search_results = await orchestrator.generate_statements(
                 main_question, current_query, iteration, query_index, start_date, end_date
             )

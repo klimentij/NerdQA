@@ -446,10 +446,20 @@
         const API_BASE_URL = 'http://localhost:8000';
 
         let socket;
+        let isWebSocketConnected = false;
+        let reconnectAttempts = 0;
+        let expectedIterations = 0;
+        let receivedIterations = 0;
 
         function connectWebSocket(sessionId) {
             socket = new WebSocket(`ws://localhost:8000/ws/${sessionId}`);
             
+            socket.onopen = function() {
+                console.log("WebSocket connection established");
+                isWebSocketConnected = true;
+                reconnectAttempts = 0;
+            };
+
             socket.onmessage = function(event) {
                 const message = JSON.parse(event.data);
                 handlePipelineUpdate(message);
@@ -457,7 +467,41 @@
 
             socket.onclose = function(event) {
                 console.log("WebSocket connection closed");
+                isWebSocketConnected = false;
+                if (reconnectAttempts < 5) {
+                    setTimeout(() => {
+                        reconnectAttempts++;
+                        console.log(`Attempting to reconnect (${reconnectAttempts}/5)...`);
+                        connectWebSocket(sessionId);
+                    }, 3000);
+                } else {
+                    console.log("Max reconnection attempts reached. Falling back to polling.");
+                    startPolling(sessionId);
+                }
             };
+
+            socket.onerror = function(error) {
+                console.error("WebSocket error:", error);
+            };
+        }
+
+        function startPolling(sessionId) {
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/pipeline_status/${sessionId}`);
+                    if (!response.ok) {
+                        throw new Error("Polling failed");
+                    }
+                    const data = await response.json();
+                    handlePipelineUpdate(data);
+                    
+                    if (data.status === "completed") {
+                        clearInterval(pollInterval);
+                    }
+                } catch (error) {
+                    console.error("Polling error:", error);
+                }
+            }, 5000); // Poll every 5 seconds
         }
 
         async function startPipeline(question, iterations, numQueries, startDate, endDate) {
@@ -483,6 +527,8 @@
 
                 const data = await response.json();
                 currentSessionId = data.session_id;
+                expectedIterations = iterations;
+                receivedIterations = 0;
                 connectWebSocket(currentSessionId);
             } catch (error) {
                 console.error('Error starting pipeline:', error);
@@ -493,8 +539,17 @@
         function handlePipelineUpdate(data) {
             if (data.type === "status" && data.data === "completed") {
                 // Handle completion
-            } else {
-                renderNewEvents([data]);
+                console.log("Pipeline completed");
+            } else if (data.type === "answer") {
+                receivedIterations++;
+                console.log(`Received iteration ${receivedIterations} of ${expectedIterations}`);
+            }
+            
+            renderNewEvents([data]);
+
+            if (receivedIterations === expectedIterations) {
+                console.log("All expected iterations received");
+                // You can add any final processing or UI updates here
             }
         }
 
