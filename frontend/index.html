@@ -531,8 +531,12 @@
                 questionScreen.style.display = 'none';
                 reportScreen.style.display = 'flex';
                 console.log("Switched to report screen");
-                reportContent.innerHTML = `<h2 class="report-title">Report for: "${question}"</h2>`;
+                displayInitialLoading();
                 chatMessages.innerHTML = '';
+                
+                // Display the first iteration query (user's question)
+                const firstQueryHtml = displayQueries([question], 1);
+                chatMessages.innerHTML += firstQueryHtml;
             }
         }
 
@@ -579,14 +583,32 @@
                 statusClass = 'draft';
             }
             
-            reportContent.innerHTML = `
-                <h2 class="report-title">${questionInput.value}</h2>
+            const statusHtml = `
                 <h3 class="report-status ${statusClass}">
                     <i class="fas ${iteration === totalIterations ? 'fa-check-circle' : 'fa-sync fa-spin'}"></i>
                     ${reportStatus}
                 </h3>
-                ${processedAnswer}
             `;
+
+            if (iteration === 1) {
+                reportContent.innerHTML = `
+                    <h2 class="report-title">${questionInput.value}</h2>
+                    ${statusHtml}
+                    ${processedAnswer}
+                `;
+            } else {
+                // Update only the status and answer for subsequent iterations
+                const statusElement = reportContent.querySelector('.report-status');
+                if (statusElement) {
+                    statusElement.outerHTML = statusHtml;
+                }
+                const answerElement = reportContent.querySelector('.processed-answer');
+                if (answerElement) {
+                    answerElement.outerHTML = processedAnswer;
+                } else {
+                    reportContent.innerHTML += processedAnswer;
+                }
+            }
 
             updateCitationTrees(fullCitationTree);
             
@@ -628,7 +650,7 @@
                 return match;
             });
 
-            return html;
+            return `<div class="processed-answer">${html}</div>`;
         }
 
         function updateEvidenceFromTree(node) {
@@ -785,6 +807,16 @@
         // Call adjustLayout on page load and window resize
         window.addEventListener('load', adjustLayout);
         window.addEventListener('resize', adjustLayout);
+
+        function displayInitialLoading() {
+            reportContent.innerHTML = `
+                <h2 class="report-title">${questionInput.value}</h2>
+                <h3 class="report-status draft">
+                    <i class="fas fa-sync fa-spin"></i>
+                    Preparing the initial report draft...
+                </h3>
+            `;
+        }
     </script>
 </body>
 </html>
