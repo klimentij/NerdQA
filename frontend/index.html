@@ -698,9 +698,15 @@
             let html = marked.parse(answer);
 
             // Then, process citations
-            html = html.replace(/\[(S\d+|E\d+)\]/g, (match, id) => {
-                // Always create a link and citation tree container, even if data is not available
-                return `<a href="#" class="citation" data-id="${id}">${match}</a><div class="citation-tree" id="tree-${id}"></div>`;
+            html = html.replace(/\[((?:S\d+|E\d+)(?:,\s*(?:S\d+|E\d+))*)\]/g, (match, ids) => {
+                const idArray = ids.split(/,\s*/);
+                const links = idArray.map(id => 
+                    `<a href="#" class="citation" data-id="${id.trim()}">[${id.trim()}]</a>`
+                ).join(', ');
+                const trees = idArray.map(id => 
+                    `<div class="citation-tree" id="tree-${id.trim()}"></div>`
+                ).join('');
+                return `${links}${trees}`;
             });
 
             return `<div class="processed-answer">${html}</div>`;
