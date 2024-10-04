@@ -29,6 +29,7 @@ Synthesize a detailed, scientifically robust answer to the main research questio
 12. Discuss the strength of the evidence and any limitations in the current research, if applicable
 13. Identify areas where further research may be needed
 14. Be informative and authoritative, focusing on the most important and relevant information while also exploring nuances and details
+15. Include relevant and useful URLs formatted as markdown links to enhance the answer's usefulness and user-friendliness
 
 Remember, your role is to provide the most accurate, comprehensive, and scientifically sound answer possible based on the current findings. The synthesis should be suitable for an audience with a strong scientific background or interest in the topic.
 
@@ -54,6 +55,8 @@ Caffeine (1,3,7-trimethylxanthine) is a xanthine alkaloid with a molecular formu
 - **Variable half-life**: Typically 3-7 hours in adults, but can be influenced by factors such as pregnancy, liver function, and smoking status [S004]
 - **Metabolism**: Primarily by the cytochrome P450 1A2 (CYP1A2) enzyme in the liver [S005]
 
+For more information on caffeine's chemical properties, visit the [PubChem Caffeine Compound Summary](https://pubchem.ncbi.nlm.nih.gov/compound/Caffeine).
+
 #### 1.2 Primary Mechanism of Action
 
 Caffeine's primary mechanism of action involves antagonism of adenosine receptors, particularly the A1 and A2A subtypes [S006]. This antagonism leads to:
@@ -61,6 +64,8 @@ Caffeine's primary mechanism of action involves antagonism of adenosine receptor
 a) Increased neuronal firing rates [S007]
 b) Enhanced release of neurotransmitters, including dopamine, norepinephrine, and acetylcholine [S008]
 c) Vasoconstriction in some brain regions, potentially affecting cerebral blood flow [S009]
+
+Learn more about adenosine receptors and their role in the brain at the [IUPHAR/BPS Guide to Pharmacology](https://www.guidetopharmacology.org/GRAC/FamilyIntroductionForward?familyId=3).
 
 #### 1.3 Secondary Mechanisms
 
@@ -209,3 +214,8 @@ Caffeine exerts profound and multifaceted effects on cognitive performance and s
 Individual variability, influenced by genetic factors, plays a crucial role in determining the magnitude and nature of caffeine's effects. As research continues to unravel the complexities of caffeine's actions, a more nuanced and personalized approach to its consumption may emerge, optimizing cognitive benefits while minimizing sleep disruption.
 
 The ongoing scientific exploration of caffeine's effects promises to yield valuable insights into cognitive enhancement, sleep regulation, and the intricate relationship between these fundamental aspects of human functioning.
+
+For more information on caffeine's effects and current research, visit:
+- [National Institute on Drug Abuse: Caffeine](https://nida.nih.gov/research-topics/caffeine)
+- [Sleep Foundation: Caffeine and Sleep](https://www.sleepfoundation.org/nutrition/caffeine-and-sleep)
+- [Cognitive Neuroscience Society: Caffeine and Cognition](https://www.cogneurosociety.org/caffeine/)
