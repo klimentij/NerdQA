@@ -50,7 +50,7 @@ from src.tools.search_client import SearchClient
 logger = setup_logging(__file__, log_level="DEBUG")
 
 class ExaSearchClient(SearchClient):
-    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.2, **kwargs):
+    def __init__(self, type: str = "neural", use_autoprompt: bool = True, reranking_threshold: float = 0.05, **kwargs):
         super().__init__(reranking_threshold=reranking_threshold, **kwargs)
         self.base_url = "https://api.exa.ai/search"
         self.api_key = os.environ.get("EXA_SEARCH_API_KEY")

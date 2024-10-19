@@ -47,7 +47,7 @@ class SearchClient(ABC):
     def __init__(self, max_document_size_tokens: int = 3000, chunk_size: int = 2048, chunk_overlap: int = 512, 
                  rerank: bool = True, max_docs_to_rerank: int = 1000, num_results: int = 25, 
                  caching: bool = True, sort: str = None, initial_top_to_retrieve: int = 20, 
-                 reranking_threshold: float = 0.2, max_concurrent_downloads: int = 50, 
+                 reranking_threshold: float = 0.1, max_concurrent_downloads: int = 50, 
                  url_list_retry_rounds: int = 1, use_pdf_cache: bool = True, downloader=None,
                  use_chunking: bool = True):  # Add this parameter
         self.session = requests.Session()
@@ -288,6 +288,8 @@ Current query the user needs to answer to progress towards solving the main ques
 
             for i, result in enumerate(filtered_results, 1):
                 result['meta']['reranker_rank'] = i
+
+            logger.info(f"Kept {len(filtered_results)} results after reranking and filtering with threshold {self.reranking_threshold}")
 
             return filtered_results
 
