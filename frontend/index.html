@@ -564,7 +564,7 @@
                         newEventsHtml += displayStatements(message.data, message.iteration);
                         break;
                     case 'answer':
-                        newEventsHtml += displayAnswer(message.data, message.iteration, message.summary, message.full_citation_tree);
+                        newEventsHtml += displayAnswer(message.data, message.iteration, message.summary, message.citation_trees);
                         break;
                 }
             });
@@ -608,22 +608,17 @@
             return `<div><h3>Iteration ${iteration} - Statements</h3>${statementsHtml}</div>`;
         }
 
-        function displayAnswer(answer, iteration, summary, fullCitationTree) {
+        function displayAnswer(answer, iteration, summary, citationTrees) {
             console.log("Updating report content with answer:", answer);
             currentIteration = iteration;
             
-            // Remember the currently open tree
-            const openTreeId = currentOpenTreeId;
-            
             // Update allEvidence with new evidence
-            if (fullCitationTree && typeof fullCitationTree === 'object') {
-                Object.keys(fullCitationTree).forEach(stmtId => {
-                    if (fullCitationTree[stmtId]) {
-                        updateEvidenceFromTree(fullCitationTree[stmtId]);
-                    }
+            if (citationTrees && typeof citationTrees === 'object') {
+                Object.values(citationTrees).forEach(tree => {
+                    updateEvidenceFromTree(tree);
                 });
             } else {
-                console.warn("fullCitationTree is not a valid object:", fullCitationTree);
+                console.warn("citationTrees is not a valid object:", citationTrees);
             }
 
             const processedAnswer = processAnswer(answer);
@@ -665,17 +660,8 @@
                 }
             }
 
-            updateCitationTrees(fullCitationTree);
+            updateCitationTrees(citationTrees);
             
-            // Restore the open tree if it still exists
-            if (openTreeId) {
-                const tree = document.getElementById(openTreeId);
-                if (tree) {
-                    tree.classList.remove('hidden');
-                    currentOpenTreeId = openTreeId;
-                }
-            }
-
             // Return HTML for chat instead of appending
             let chatHtml = '';
             if (summary) {
@@ -734,8 +720,8 @@
             });
         }
 
-        function updateCitationTrees(fullCitationTree) {
-            Object.entries(fullCitationTree).forEach(([stmtId, tree]) => {
+        function updateCitationTrees(citationTrees) {
+            Object.entries(citationTrees).forEach(([stmtId, tree]) => {
                 const treeContainer = document.getElementById(`tree-${stmtId}`);
                 if (treeContainer && tree.children && tree.children.length > 0) {
                     const treeHtml = renderCitationTree(tree);

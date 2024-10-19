@@ -302,7 +302,24 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
             main_question, iteration
         )
 
-        cited_statements = set(re.findall(r'\[(S\d+)\]', answer))
+        # Normalize citation format
+        def normalize_citations(text):
+            # Find all citation groups (content inside square brackets)
+            citation_groups = re.findall(r'\[([^\]]+)\]', text)
+            
+            for group in citation_groups:
+                # Extract individual citation numbers
+                citations = re.findall(r'S\d+', group)
+                # Create normalized citation string
+                normalized = '], ['.join(citations)
+                # Replace the original group with the normalized version
+                text = text.replace(f'[{group}]', f'[{normalized}]')
+            
+            return text
+
+        normalized_answer = normalize_citations(answer)
+        
+        cited_statements = set(re.findall(r'S\d+', normalized_answer))
         full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
 
         iteration_summary = {
@@ -317,16 +334,17 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
 
         new_message = {
             "type": "answer",
-            "data": answer,
+            "data": normalized_answer,  # Use normalized_answer instead of answer
             "iteration": iteration + 1,
             "summary": iteration_summary,
-            "full_citation_tree": full_citation_tree
+            "citation_trees": full_citation_tree
         }
+        
         session["messages"].append(new_message)
         await send_update(session_id, new_message)
 
-        session["final_answer"] = answer
-        session["full_citation_tree"] = full_citation_tree
+        session["final_answer"] = normalized_answer  # Store normalized_answer in the session
+        session["citation_trees"] = full_citation_tree
         session["summary"] = iteration_summary
 
     session["status"] = "completed"
@@ -407,10 +425,9 @@ def generate_full_citation_tree(all_statements, all_evidence, cited_statements, 
                 'id': node_id,
                 'text': evidence.get('text', "Evidence text not found"),
                 'url': evidence.get('meta', {}).get('url', ""),
-                'openalex_id': evidence.get('meta', {}).get('openalex_id', "")  # Add this line
+                'openalex_id': evidence.get('meta', {}).get('openalex_id', "")
             }
             if reference['url'] == "":
-                # possibly a paper
                 reference['url'] = evidence.get('meta', {}).get('id', '')
                 reference['title'] = evidence.get('meta', {}).get('title', "")
                 reference['publication_date'] = evidence.get('meta', {}).get('publication_date', "")
