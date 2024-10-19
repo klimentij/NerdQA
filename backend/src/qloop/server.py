@@ -304,18 +304,19 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
 
         # Normalize citation format
         def normalize_citations(text):
-            # Find all citation groups (content inside square brackets)
-            citation_groups = re.findall(r'\[([^\]]+)\]', text)
-            
-            for group in citation_groups:
-                # Extract individual citation numbers
-                citations = re.findall(r'S\d+', group)
-                # Create normalized citation string
-                normalized = '], ['.join(citations)
-                # Replace the original group with the normalized version
-                text = text.replace(f'[{group}]', f'[{normalized}]')
-            
-            return text
+            def process_bracket_content(match):
+                content = match.group(1)
+                if re.search(r'S\d+', content):
+                    # This is a citation group
+                    citations = re.findall(r'S\d+', content)
+                    return '[' + '], ['.join(citations) + ']'
+                else:
+                    # This is not a citation, return it unchanged
+                    return f'[{content}]'
+
+            # Process all bracket contents
+            normalized = re.sub(r'\[([^\]]+)\]', process_bracket_content, text)
+            return normalized
 
         normalized_answer = normalize_citations(answer)
         
