@@ -323,6 +323,20 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
         cited_statements = set(re.findall(r'S\d+', normalized_answer))
         full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
 
+        # Create a mapping of original S ids to sequential ids
+        s_id_mapping = {s_id: f'S{i+1}' for i, s_id in enumerate(cited_statements)}
+
+        # Replace S ids in the answer
+        for original_id, seq_id in s_id_mapping.items():
+            normalized_answer = normalized_answer.replace(original_id, seq_id)
+
+        # Replace S ids in the citation tree
+        updated_citation_tree = {}
+        for original_id, tree in full_citation_tree.items():
+            new_id = s_id_mapping.get(original_id, original_id)
+            updated_tree = replace_ids_in_tree(tree, s_id_mapping)
+            updated_citation_tree[new_id] = updated_tree
+
         iteration_summary = {
             "iteration": iteration + 1,
             "new_evidence_found": new_evidence_found,
@@ -335,17 +349,17 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
 
         new_message = {
             "type": "answer",
-            "data": normalized_answer,  # Use normalized_answer instead of answer
+            "data": normalized_answer,
             "iteration": iteration + 1,
             "summary": iteration_summary,
-            "citation_trees": full_citation_tree
+            "citation_trees": updated_citation_tree
         }
         
         session["messages"].append(new_message)
         await send_update(session_id, new_message)
 
         session["final_answer"] = normalized_answer  # Store normalized_answer in the session
-        session["citation_trees"] = full_citation_tree
+        session["citation_trees"] = updated_citation_tree
         session["summary"] = iteration_summary
 
     session["status"] = "completed"
@@ -480,6 +494,17 @@ def find_evidence_in_tree(node, target_id):
         if result:
             return result
     return None
+
+# Add this new function to replace ids in the tree
+def replace_ids_in_tree(node, id_mapping):
+    if isinstance(node, dict):
+        new_node = node.copy()
+        if 'id' in new_node and new_node['id'] in id_mapping:
+            new_node['id'] = id_mapping[new_node['id']]
+        if 'children' in new_node:
+            new_node['children'] = [replace_ids_in_tree(child, id_mapping) for child in new_node['children']]
+        return new_node
+    return node
 
 if __name__ == "__main__":
     import uvicorn
