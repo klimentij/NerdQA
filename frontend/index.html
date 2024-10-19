@@ -697,7 +697,7 @@
             // First, convert Markdown to HTML
             let html = marked.parse(answer);
 
-            // Then, process citations
+            // Process citations
             html = html.replace(/\[((?:S\d+|E\d+)(?:,\s*(?:S\d+|E\d+))*)\]/g, (match, ids) => {
                 const idArray = ids.split(/,\s*/);
                 const links = idArray.map(id => 
@@ -708,6 +708,9 @@
                 ).join('');
                 return `${links}${trees}`;
             });
+
+            // Modify external links to open in new tabs
+            html = html.replace(/<a\s+href="(https?:\/\/[^"]+)">/g, '<a href="$1" target="_blank" rel="noopener noreferrer">');
 
             return `<div class="processed-answer">${html}</div>`;
         }
@@ -833,7 +836,7 @@
             let html = `<li id="tree-${node.id}"><strong>${node.id}:</strong> <span class="tree-text">${text}</span>${showMoreLink}`;
             
             if (node.id.startsWith('E') && node.url) {
-                html += `<br><a href="${node.url}" target="_blank">${node.url}</a>`;
+                html += `<br><a href="${node.url}" target="_blank" rel="noopener noreferrer">${node.url}</a>`;
             }
             if (node.children && node.children.length > 0) {
                 html += '<ul>';
