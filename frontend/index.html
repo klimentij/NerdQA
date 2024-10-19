@@ -380,6 +380,20 @@
         .report-status.final {
             color: #2ecc71;
         }
+
+        .show-more {
+            background: none;
+            border: none;
+            color: #0066cc;
+            cursor: pointer;
+            font-size: inherit;
+            padding: 0;
+            margin-left: 5px;
+        }
+
+        .show-more:hover {
+            text-decoration: underline;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
@@ -792,10 +806,32 @@
                     currentOpenTreeId = null;
                 });
             });
+
+            // Add event listeners for "Show more" buttons
+            document.querySelectorAll('.show-more').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const fullText = decodeURIComponent(e.target.dataset.fullText);
+                    const textSpan = e.target.previousElementSibling;
+                    textSpan.textContent = fullText;
+                    e.target.remove();
+                });
+            });
         }
 
         function renderCitationTree(node) {
-            let html = `<li id="tree-${node.id}"><strong>${node.id}:</strong> ${node.text}`;
+            const maxLength = 300;
+            let text = node.text;
+            let showMoreLink = '';
+            
+            if (text.length > maxLength) {
+                const shortText = text.substring(0, maxLength);
+                showMoreLink = `... <button class="show-more" data-full-text="${encodeURIComponent(text)}">Show more</button>`;
+                text = shortText;
+            }
+
+            let html = `<li id="tree-${node.id}"><strong>${node.id}:</strong> <span class="tree-text">${text}</span>${showMoreLink}`;
+            
             if (node.id.startsWith('E') && node.url) {
                 html += `<br><a href="${node.url}" target="_blank">${node.url}</a>`;
             }
