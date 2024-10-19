@@ -298,69 +298,89 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
             for stmt in statements:
                 orchestrator.current_history += f"Statement {stmt['id']}: {stmt['text']}\n"
 
-        answer = await orchestrator.generate_answer(
-            main_question, iteration
-        )
+        # Check if any statements have been created
+        if total_statements == 0:
+            predefined_answer = "I apologize, but I haven't found sufficient support for answering your question yet. A few more iterations might be needed to gather relevant information. Please allow the process to continue or try rephrasing your question."
+            
+            new_message = {
+                "type": "answer",
+                "data": predefined_answer,
+                "iteration": iteration + 1,
+                "summary": {
+                    "iteration": iteration + 1,
+                    "new_evidence_found": new_evidence_found,
+                    "new_evidence_used": new_evidence_used,
+                    "new_statements": new_statements,
+                    "total_evidence_found": len(all_evidence_ids),
+                    "total_evidence_used": len(used_evidence_ids),
+                    "total_statements": total_statements
+                },
+                "citation_trees": {}
+            }
+        else:
+            answer = await orchestrator.generate_answer(
+                main_question, iteration
+            )
 
-        # Normalize citation format
-        def normalize_citations(text):
-            def process_bracket_content(match):
-                content = match.group(1)
-                if re.search(r'S\d+', content):
-                    # This is a citation group
-                    citations = re.findall(r'S\d+', content)
-                    return '[' + '], ['.join(citations) + ']'
-                else:
-                    # This is not a citation, return it unchanged
-                    return f'[{content}]'
+            # Normalize citation format
+            def normalize_citations(text):
+                def process_bracket_content(match):
+                    content = match.group(1)
+                    if re.search(r'S\d+', content):
+                        # This is a citation group
+                        citations = re.findall(r'S\d+', content)
+                        return '[' + '], ['.join(citations) + ']'
+                    else:
+                        # This is not a citation, return it unchanged
+                        return f'[{content}]'
 
-            # Process all bracket contents
-            normalized = re.sub(r'\[([^\]]+)\]', process_bracket_content, text)
-            return normalized
+                # Process all bracket contents
+                normalized = re.sub(r'\[([^\]]+)\]', process_bracket_content, text)
+                return normalized
 
-        normalized_answer = normalize_citations(answer)
-        
-        cited_statements = set(re.findall(r'S\d+', normalized_answer))
-        full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
+            normalized_answer = normalize_citations(answer)
+            
+            cited_statements = set(re.findall(r'S\d+', normalized_answer))
+            full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
 
-        # Create a mapping of original S ids to sequential ids
-        s_id_mapping = {s_id: f'S{i+1}' for i, s_id in enumerate(cited_statements)}
+            # Create a mapping of original S ids to sequential ids
+            s_id_mapping = {s_id: f'S{i+1}' for i, s_id in enumerate(cited_statements)}
 
-        # Replace S ids in the answer
-        for original_id, seq_id in s_id_mapping.items():
-            normalized_answer = normalized_answer.replace(original_id, seq_id)
+            # Replace S ids in the answer
+            for original_id, seq_id in s_id_mapping.items():
+                normalized_answer = normalized_answer.replace(original_id, seq_id)
 
-        # Replace S ids in the citation tree
-        updated_citation_tree = {}
-        for original_id, tree in full_citation_tree.items():
-            new_id = s_id_mapping.get(original_id, original_id)
-            updated_tree = replace_ids_in_tree(tree, s_id_mapping)
-            updated_citation_tree[new_id] = updated_tree
+            # Replace S ids in the citation tree
+            updated_citation_tree = {}
+            for original_id, tree in full_citation_tree.items():
+                new_id = s_id_mapping.get(original_id, original_id)
+                updated_tree = replace_ids_in_tree(tree, s_id_mapping)
+                updated_citation_tree[new_id] = updated_tree
 
-        iteration_summary = {
-            "iteration": iteration + 1,
-            "new_evidence_found": new_evidence_found,
-            "new_evidence_used": new_evidence_used,
-            "new_statements": new_statements,
-            "total_evidence_found": len(all_evidence_ids),
-            "total_evidence_used": len(used_evidence_ids),
-            "total_statements": total_statements
-        }
+            iteration_summary = {
+                "iteration": iteration + 1,
+                "new_evidence_found": new_evidence_found,
+                "new_evidence_used": new_evidence_used,
+                "new_statements": new_statements,
+                "total_evidence_found": len(all_evidence_ids),
+                "total_evidence_used": len(used_evidence_ids),
+                "total_statements": total_statements
+            }
 
-        new_message = {
-            "type": "answer",
-            "data": normalized_answer,
-            "iteration": iteration + 1,
-            "summary": iteration_summary,
-            "citation_trees": updated_citation_tree
-        }
+            new_message = {
+                "type": "answer",
+                "data": normalized_answer,
+                "iteration": iteration + 1,
+                "summary": iteration_summary,
+                "citation_trees": updated_citation_tree
+            }
         
         session["messages"].append(new_message)
         await send_update(session_id, new_message)
 
-        session["final_answer"] = normalized_answer  # Store normalized_answer in the session
-        session["citation_trees"] = updated_citation_tree
-        session["summary"] = iteration_summary
+        session["final_answer"] = new_message["data"]
+        session["citation_trees"] = new_message.get("citation_trees", {})
+        session["summary"] = new_message["summary"]
 
     session["status"] = "completed"
     await send_update(session_id, {"type": "status", "data": "completed"})
