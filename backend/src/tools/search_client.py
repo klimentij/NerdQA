@@ -147,7 +147,18 @@ class SearchClient(ABC):
             
             after_reranking = len(reranked_results)
             
-            result = {"results": reranked_results}
+            # Create a dictionary with search statistics
+            search_stats = {
+                "initially_retrieved": initially_retrieved,
+                "after_chunking": after_chunking,
+                "after_reranking": after_reranking
+            }
+            
+            # Include the search stats in the result dictionary
+            result = {
+                "results": reranked_results,
+                "search_stats": search_stats
+            }
             
             # Cache the result only if caching is enabled
             if self.cache:
