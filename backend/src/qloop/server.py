@@ -318,62 +318,79 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
                 "citation_trees": {}
             }
         else:
-            answer = await orchestrator.generate_answer(
-                main_question, iteration
-            )
+            if iteration == iterations - 1:
+                # Generate the answer only on the last iteration
+                answer = await orchestrator.generate_answer(main_question, iteration)
 
-            # Normalize citation format
-            def normalize_citations(text):
-                def process_bracket_content(match):
-                    content = match.group(1)
-                    if re.search(r'S\d+', content):
-                        # This is a citation group
-                        citations = re.findall(r'S\d+', content)
-                        return '[' + '], ['.join(citations) + ']'
-                    else:
-                        # This is not a citation, return it unchanged
-                        return f'[{content}]'
+                # Normalize citation format
+                def normalize_citations(text):
+                    def process_bracket_content(match):
+                        content = match.group(1)
+                        if re.search(r'S\d+', content):
+                            # This is a citation group
+                            citations = re.findall(r'S\d+', content)
+                            return '[' + '], ['.join(citations) + ']'
+                        else:
+                            # This is not a citation, return it unchanged
+                            return f'[{content}]'
 
-                # Process all bracket contents
-                normalized = re.sub(r'\[([^\]]+)\]', process_bracket_content, text)
-                return normalized
+                    # Process all bracket contents
+                    normalized = re.sub(r'\[([^\]]+)\]', process_bracket_content, text)
+                    return normalized
 
-            normalized_answer = normalize_citations(answer)
-            
-            cited_statements = set(re.findall(r'S\d+', normalized_answer))
-            full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
+                normalized_answer = normalize_citations(answer)
+                
+                cited_statements = set(re.findall(r'S\d+', normalized_answer))
+                full_citation_tree = generate_full_citation_tree(all_statements, all_evidence, cited_statements)
 
-            # Create a mapping of original S ids to sequential ids
-            s_id_mapping = {s_id: f'S{i+1}' for i, s_id in enumerate(cited_statements)}
+                # Create a mapping of original S ids to sequential ids
+                s_id_mapping = {s_id: f'S{i+1}' for i, s_id in enumerate(cited_statements)}
 
-            # Replace S ids in the answer
-            for original_id, seq_id in s_id_mapping.items():
-                normalized_answer = normalized_answer.replace(original_id, seq_id)
+                # Replace S ids in the answer
+                for original_id, seq_id in s_id_mapping.items():
+                    normalized_answer = normalized_answer.replace(original_id, seq_id)
 
-            # Replace S ids in the citation tree
-            updated_citation_tree = {}
-            for original_id, tree in full_citation_tree.items():
-                new_id = s_id_mapping.get(original_id, original_id)
-                updated_tree = replace_ids_in_tree(tree, s_id_mapping)
-                updated_citation_tree[new_id] = updated_tree
+                # Replace S ids in the citation tree
+                updated_citation_tree = {}
+                for original_id, tree in full_citation_tree.items():
+                    new_id = s_id_mapping.get(original_id, original_id)
+                    updated_tree = replace_ids_in_tree(tree, s_id_mapping)
+                    updated_citation_tree[new_id] = updated_tree
 
-            iteration_summary = {
-                "iteration": iteration + 1,
-                "new_evidence_found": new_evidence_found,
-                "new_evidence_used": new_evidence_used,
-                "new_statements": new_statements,
-                "total_evidence_found": len(all_evidence_ids),
-                "total_evidence_used": len(used_evidence_ids),
-                "total_statements": total_statements
-            }
+                iteration_summary = {
+                    "iteration": iteration + 1,
+                    "new_evidence_found": new_evidence_found,
+                    "new_evidence_used": new_evidence_used,
+                    "new_statements": new_statements,
+                    "total_evidence_found": len(all_evidence_ids),
+                    "total_evidence_used": len(used_evidence_ids),
+                    "total_statements": total_statements
+                }
 
-            new_message = {
-                "type": "answer",
-                "data": normalized_answer,
-                "iteration": iteration + 1,
-                "summary": iteration_summary,
-                "citation_trees": updated_citation_tree
-            }
+                new_message = {
+                    "type": "answer",
+                    "data": normalized_answer,
+                    "iteration": iteration + 1,
+                    "summary": iteration_summary,
+                    "citation_trees": updated_citation_tree
+                }
+            else:
+                # Submit fixed text for non-final iterations
+                new_message = {
+                    "type": "answer",
+                    "data": "I am discovering new knowledge and researching to support the answer as best as I can.",
+                    "iteration": iteration + 1,
+                    "summary": {
+                        "iteration": iteration + 1,
+                        "new_evidence_found": new_evidence_found,
+                        "new_evidence_used": new_evidence_used,
+                        "new_statements": new_statements,
+                        "total_evidence_found": len(all_evidence_ids),
+                        "total_evidence_used": len(used_evidence_ids),
+                        "total_statements": total_statements
+                    },
+                    "citation_trees": {}
+                }
         
         session["messages"].append(new_message)
         await send_update(session_id, new_message)
