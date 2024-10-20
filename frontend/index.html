@@ -483,6 +483,7 @@
         // });
 
         newButton.addEventListener('click', () => {
+            // Remove WebSocket connection and reset variables
             if (socket) {
                 socket.close();
             }
@@ -490,9 +491,9 @@
             currentIteration = 0;
             allStatements = {};
             allEvidence = {};
-            reportScreen.style.display = 'none';
-            questionScreen.style.display = 'flex';
-            questionInput.value = '';
+
+            // Perform a full page reload
+            window.location.reload();
         });
 
         function appendToChat(title, content) {
