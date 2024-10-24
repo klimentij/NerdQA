@@ -245,57 +245,50 @@
                 console.warn("citationTrees is not a valid object:", citationTrees);
             }
 
-            const processedAnswer = processAnswer(answer);
-            
             const totalIterations = parseInt(iterationsInput.value, 10);
-            let reportStatus, statusClass;
-            if (iteration === totalIterations) {
-                reportStatus = 'Final report';
-                statusClass = 'final';
-            } else {
-                reportStatus = `Report draft: Iteration ${iteration} of ${totalIterations}`;
-                statusClass = 'draft';
-            }
-            
-            const statusHtml = `
-                <h3 class="report-status ${statusClass}">
-                    <i class="fas ${iteration === totalIterations ? 'fa-check-circle' : 'fa-sync fa-spin'}"></i>
-                    ${reportStatus}
-                </h3>
-            `;
+            let statusHtml;
 
-            const exportButtonHtml = `
-                <button id="exportButton" class="export-button" style="display: none;">
-                    <i class="fas fa-download"></i> Export to HTML
-                </button>
-            `;
+            if (iteration === totalIterations) {
+                statusHtml = `
+                    <button id="exportButton" class="export-button">
+                        <i class="fas fa-download"></i> Export to HTML
+                    </button>
+                `;
+            } else {
+                statusHtml = `
+                    <h3 class="report-status draft">
+                        <i class="fas fa-sync fa-spin"></i>
+                        Report draft: Iteration ${iteration} of ${totalIterations}
+                    </h3>
+                `;
+            }
+
+            const processedAnswer = processAnswer(answer);
 
             if (iteration === 1) {
                 reportContent.innerHTML = `
                     <h2 class="report-title">${questionInput.value}</h2>
-                    ${exportButtonHtml}
-                    ${statusHtml}
-                    ${processedAnswer}
+                    <div id="statusContainer">${statusHtml}</div>
+                    <div class="processed-answer">${processedAnswer}</div>
                 `;
             } else {
                 // Update only the status and answer for subsequent iterations
-                const statusElement = reportContent.querySelector('.report-status');
-                if (statusElement) {
-                    statusElement.outerHTML = statusHtml;
+                const statusContainer = reportContent.querySelector('#statusContainer');
+                if (statusContainer) {
+                    statusContainer.innerHTML = statusHtml;
                 }
                 const answerElement = reportContent.querySelector('.processed-answer');
                 if (answerElement) {
-                    answerElement.outerHTML = processedAnswer;
+                    answerElement.innerHTML = processedAnswer;
                 } else {
-                    reportContent.innerHTML += processedAnswer;
+                    reportContent.innerHTML += `<div class="processed-answer">${processedAnswer}</div>`;
                 }
             }
 
-            // Show export button when the final answer is ready
+            // Add event listener for export button
             if (iteration === totalIterations) {
                 const exportButton = document.getElementById('exportButton');
                 if (exportButton) {
-                    exportButton.style.display = 'inline-block';
                     exportButton.addEventListener('click', exportToHtml);
                 }
             }

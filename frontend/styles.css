@@ -393,16 +393,15 @@ h1 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 15px;
+    padding: 8px 12px; /* Reduce padding to make the button smaller */
     background-color: #4CAF50;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px; /* Reduce font size */
     transition: background-color 0.3s;
-    margin-left: 10px;
-    vertical-align: middle;
+    margin-left: 0; /* Remove left margin to align left */
 }
 
 .export-button:hover {
@@ -427,4 +426,8 @@ h1 {
         font-size: 14px;
         padding: 8px 12px;
     }
+}
+
+#statusContainer {
+    margin-bottom: 30px; /* Add more space below the button */
 }
