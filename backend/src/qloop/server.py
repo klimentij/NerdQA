@@ -227,7 +227,18 @@ def generate_html_export(main_question: str, final_answer: str, citation_trees: 
         if not node:
             return ""
         
-        html = f'<li id="tree-{node["id"]}"><strong>{node["id"]}:</strong> {node["text"]}'
+        html = f'<li id="tree-{node["id"]}">'
+        
+        text = node["text"]
+        if len(text) > 300:
+            short_text = text[:300]
+            full_text = text.replace('"', '&quot;')
+            html += f'<strong>{node["id"]}:</strong> <span class="tree-text">{short_text}</span>'
+            html += f'<span class="ellipsis">...</span>'
+            html += f'<button class="show-more" data-full-text="{full_text}">Show more</button>'
+        else:
+            html += f'<strong>{node["id"]}:</strong> <span class="tree-text">{text}</span>'
+        
         if node['id'].startswith('E'):
             url = node.get('url', '')
             if url:
@@ -252,24 +263,19 @@ def generate_html_export(main_question: str, final_answer: str, citation_trees: 
         <style>
             body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
             h1, h2, h3 {{ color: #333; }}
-            .citation-tree {{ margin-top: 20px; }}
+            .citation-tree {{ margin-top: 20px; background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
             .citation-tree ul {{ list-style-type: none; }}
             .citation-tree li {{ margin: 10px 0; }}
             .back-to-top {{ text-decoration: none; color: #0066cc; }}
+            .ellipsis {{ font-weight: bold; }}
+            .show-more {{ background: none; border: none; color: #0066cc; cursor: pointer; }}
         </style>
     </head>
     <body>
         <h1>{main_question}</h1>
-        <h2>Answer</h2>
         <div id="answer-content">
             {processed_answer}
         </div>
-        <h3>Summary</h3>
-        <ul>
-            <li>Total evidence found: {summary['total_evidence_found']}</li>
-            <li>Total evidence used: {summary['total_evidence_used']}</li>
-            <li>Total statements: {summary['total_statements']}</li>
-        </ul>
         <h2>Citation Trees</h2>
         <div class="citation-tree">
     """
@@ -285,6 +291,17 @@ def generate_html_export(main_question: str, final_answer: str, citation_trees: 
     
     html_content += """
         </div>
+        <script>
+            document.addEventListener('click', function(e) {
+                if (e.target && e.target.classList.contains('show-more')) {
+                    const fullText = e.target.getAttribute('data-full-text');
+                    const textSpan = e.target.previousElementSibling.previousElementSibling;
+                    textSpan.textContent = fullText;
+                    e.target.previousElementSibling.remove(); // Remove ellipsis
+                    e.target.remove(); // Remove show more button
+                }
+            });
+        </script>
     </body>
     </html>
     """
