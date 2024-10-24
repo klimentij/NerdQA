@@ -264,9 +264,16 @@
                 </h3>
             `;
 
+            const exportButtonHtml = `
+                <button id="exportButton" class="export-button" style="display: none;">
+                    <i class="fas fa-download"></i> Export to HTML
+                </button>
+            `;
+
             if (iteration === 1) {
                 reportContent.innerHTML = `
                     <h2 class="report-title">${questionInput.value}</h2>
+                    ${exportButtonHtml}
                     ${statusHtml}
                     ${processedAnswer}
                 `;
@@ -281,6 +288,15 @@
                     answerElement.outerHTML = processedAnswer;
                 } else {
                     reportContent.innerHTML += processedAnswer;
+                }
+            }
+
+            // Show export button when the final answer is ready
+            if (iteration === totalIterations) {
+                const exportButton = document.getElementById('exportButton');
+                if (exportButton) {
+                    exportButton.style.display = 'inline-block';
+                    exportButton.addEventListener('click', exportToHtml);
                 }
             }
 
@@ -553,6 +569,27 @@
             } catch (error) {
                 console.error('Error fetching citation data:', error);
                 return null;
+            }
+        }
+
+        async function exportToHtml() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/export/${currentSessionId}`);
+                if (!response.ok) {
+                    throw new Error('Export failed');
+                }
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'report.html';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error exporting HTML:', error);
+                alert('Failed to export HTML. Please try again.');
             }
         }
     </script>

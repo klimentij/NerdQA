@@ -121,6 +121,8 @@ h1 {
 .report-title {
     font-size: 28px;
     margin-bottom: 30px;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .report-subtitle {
@@ -384,4 +386,45 @@ h1 {
 
 .show-more:hover {
     text-decoration: underline;
+}
+
+/* Add these styles for the export button */
+.export-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.export-button:hover {
+    background-color: #45a049;
+}
+
+.export-button i {
+    margin-right: 5px;
+}
+
+/* Update the report-title style to accommodate the button */
+.report-title {
+    font-size: 28px;
+    margin-bottom: 30px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Responsive styles for the export button */
+@media (max-width: 600px) {
+    .export-button {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
 }

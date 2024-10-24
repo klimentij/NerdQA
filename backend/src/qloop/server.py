@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 import uuid
 from datetime import datetime
 import markdown
+from fastapi.responses import FileResponse
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -495,6 +496,7 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
                     session_id
                 )
                 logger.info(f"HTML export generated: {export_path}")
+                session["export_path"] = export_path
             else:
                 # Submit fixed text for non-final iterations
                 new_message = {
@@ -663,6 +665,23 @@ def replace_ids_in_tree(node, id_mapping):
             new_node['children'] = [replace_ids_in_tree(child, id_mapping) for child in new_node['children']]
         return new_node
     return node
+
+# Add this new endpoint
+@app.get("/export/{session_id}")
+async def export_html(session_id: str):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[session_id]
+    if session["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Report not yet completed")
+    
+    # Assuming the export path is stored in the session
+    export_path = session.get("export_path")
+    if not export_path or not os.path.exists(export_path):
+        raise HTTPException(status_code=404, detail="Export file not found")
+    
+    return FileResponse(export_path, filename=os.path.basename(export_path))
 
 if __name__ == "__main__":
     import uvicorn
