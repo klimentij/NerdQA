@@ -181,3 +181,6 @@ cache/
 
 # benchmark
 backend/wandb
+
+# Export folder
+export/
