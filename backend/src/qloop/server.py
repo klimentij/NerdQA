@@ -20,6 +20,8 @@ from inspect import iscoroutinefunction
 import hashlib
 from fastapi.responses import JSONResponse
 import uuid
+from datetime import datetime
+import markdown
 
 # Import necessary modules and set up paths
 os.chdir(__file__.split('src/')[0])
@@ -212,6 +214,98 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         del websocket_connections[session_id]
 
+# Add this new function to generate the HTML export
+def generate_html_export(main_question: str, final_answer: str, citation_trees: dict, summary: dict, session_id: str):
+    md = markdown.Markdown()
+    
+    def process_answer(answer):
+        html = md.convert(answer)
+        html = re.sub(r'\[(S\d+)\]', r'<a href="#tree-\1" class="citation" id="cite-\1">[\1]</a>', html)
+        return html
+    
+    def render_tree(node):
+        if not node:
+            return ""
+        
+        html = f'<li id="tree-{node["id"]}"><strong>{node["id"]}:</strong> {node["text"]}'
+        if node['id'].startswith('E'):
+            url = node.get('url', '')
+            if url:
+                html += f'<br><a href="{url}" target="_blank">{url}</a>'
+        if node.get('children'):
+            html += '<ul>'
+            for child in node['children']:
+                html += render_tree(child)
+            html += '</ul>'
+        html += '</li>'
+        return html
+
+    processed_answer = process_answer(final_answer)
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{main_question[:100]}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+            h1, h2, h3 {{ color: #333; }}
+            .citation-tree {{ margin-top: 20px; }}
+            .citation-tree ul {{ list-style-type: none; }}
+            .citation-tree li {{ margin: 10px 0; }}
+            .back-to-top {{ text-decoration: none; color: #0066cc; }}
+        </style>
+    </head>
+    <body>
+        <h1>{main_question}</h1>
+        <h2>Answer</h2>
+        <div id="answer-content">
+            {processed_answer}
+        </div>
+        <h3>Summary</h3>
+        <ul>
+            <li>Total evidence found: {summary['total_evidence_found']}</li>
+            <li>Total evidence used: {summary['total_evidence_used']}</li>
+            <li>Total statements: {summary['total_statements']}</li>
+        </ul>
+        <h2>Citation Trees</h2>
+        <div class="citation-tree">
+    """
+    
+    for stmt_id, tree in citation_trees.items():
+        html_content += f'<div id="tree-{stmt_id}">'
+        html_content += f'<h3>Citation Tree for Statement {stmt_id}</h3>'
+        html_content += '<ul>'
+        html_content += render_tree(tree)
+        html_content += '</ul>'
+        html_content += f'<a href="#cite-{stmt_id}" class="back-to-top">↑ Back to citation</a>'
+        html_content += '</div>'
+    
+    html_content += """
+        </div>
+    </body>
+    </html>
+    """
+
+    # Create the export directory
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    export_dir = os.path.join("export", current_date)
+    os.makedirs(export_dir, exist_ok=True)
+
+    # Generate the filename
+    safe_question = re.sub(r'[^\w\s-]', '', main_question[:100])
+    filename = f"{safe_question}_{session_id}.html"
+    file_path = os.path.join(export_dir, filename)
+
+    # Write the HTML content to the file
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+    return file_path
+
+# Modify the run_pipeline function to call the new export function
 async def run_pipeline(session_id: str, main_question: str, iterations: int, num_queries: int, start_date: str, end_date: str, web_search: SearchClient):
     session = sessions[session_id]
     orchestrator = session["orchestrator"]
@@ -374,6 +468,16 @@ async def run_pipeline(session_id: str, main_question: str, iterations: int, num
                     "summary": iteration_summary,
                     "citation_trees": updated_citation_tree
                 }
+
+                # After generating the final answer and updating the session, call the export function
+                export_path = generate_html_export(
+                    main_question,
+                    normalized_answer,
+                    updated_citation_tree,
+                    iteration_summary,
+                    session_id
+                )
+                logger.info(f"HTML export generated: {export_path}")
             else:
                 # Submit fixed text for non-final iterations
                 new_message = {
