@@ -7,7 +7,6 @@ from typing import Union, List, Dict, Optional, Literal
 
 from src.llm.response import Response
 from src.util.env_util import cfg, litellm_cfg
-from src.db.cache_llm import CacheLLM
 
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__, 'INFO')
