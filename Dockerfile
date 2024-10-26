@@ -1,5 +1,5 @@
-# Use a lightweight Ubuntu base image
-FROM ubuntu:22.04
+# Use Python 3.11-slim as the base image
+FROM python:3.11-slim
 
 # Avoid prompts from apt
 ENV DEBIAN_FRONTEND=noninteractive
@@ -9,37 +9,38 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3-pip \
-    python3-venv \
     git \
     redis-server \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install uv
-RUN pip3 install --no-cache-dir --upgrade pip==24.2 \
-    && pip3 install --no-cache-dir uv==0.1.24
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clone the NerdQA repository
-RUN git clone https://github.com/klimentij/NerdQA.git .
+# Add uv to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Create venv and install dependencies
-RUN python3.11 -m venv /venv
-ENV PATH="/venv/bin:$PATH"
-RUN uv venv --python=3.11 && \
-    uv pip install -r backend/config/requirements.txt
+# Copy the entire project into the container
+COPY . /app
+
+# Make the entrypoint script executable
+RUN chmod +x /app/entrypoint.sh
+
+# Install Python dependencies
+RUN python -m venv /venv && \
+    . /venv/bin/activate && \
+    uv pip install --prerelease=allow -r backend/config/requirements.txt
 
 # Configure Redis
 COPY backend/config/redis.conf /etc/redis/redis.conf
 RUN mkdir -p /data/redis && \
     chown -R redis:redis /data/redis
 
-# Create entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Set Python path
+ENV PYTHONPATH=/app
 
 # Expose ports
-EXPOSE 6379 8000 8080
+EXPOSE 6379 8000 4000 8080
 
 # Set the entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]

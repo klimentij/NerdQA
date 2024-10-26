@@ -1,27 +1,7 @@
 import os
 import sys
-import time
-import json
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import hashlib
-import urllib.parse
-from abc import ABC, abstractmethod
-from typing import List, Dict, Optional
-from tokenizers import Tokenizer
-from io import BytesIO
-from pdfminer.high_level import extract_text
-from pdfminer.layout import LAParams
-
-import asyncio
-import aiohttp
-from aiohttp import ClientSession
-from aiohttp_retry import RetryClient, ExponentialRetry
-import certifi
-import ssl
-import random
-import traceback
+from typing import Dict, List
 
 os.chdir(__file__.split('src/')[0])
 sys.path.append(os.getcwd())
@@ -31,18 +11,6 @@ from src.db.local_cache import LocalCache
 # Set up logger
 from src.util.setup_logging import setup_logging
 logger = setup_logging(__file__, log_level="DEBUG")
-
-import asyncio
-import aiohttp
-from aiohttp import ClientSession
-from aiohttp_retry import RetryClient, ExponentialRetry
-from typing import List, Dict, Optional
-from pdfminer.high_level import extract_text
-from pdfminer.layout import LAParams
-from io import BytesIO
-import hashlib
-import ssl
-import certifi
 
 from src.util.setup_logging import setup_logging
 from src.tools.search_client import SearchClient
