@@ -313,8 +313,11 @@
         }
 
         function processAnswer(answer) {
-            // First, convert Markdown to HTML
-            let html = marked.parse(answer);
+            // Use marked with specific options to preserve line breaks
+            let html = marked.parse(answer, {
+                breaks: true,
+                gfm: true
+            });
 
             // Process citations
             html = html.replace(/\[((?:S\d+|E\d+)(?:,\s*(?:S\d+|E\d+))*)\]/g, (match, ids) => {

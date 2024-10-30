@@ -431,3 +431,34 @@ h1 {
 #statusContainer {
     margin-bottom: 30px; /* Add more space below the button */
 }
+
+.processed-answer {
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.processed-answer p {
+    margin-bottom: 1em;
+}
+
+.processed-answer ul, .processed-answer ol {
+    margin-bottom: 1em;
+    padding-left: 2em;
+}
+
+.processed-answer li {
+    margin-bottom: 0.5em;
+}
+
+.processed-answer h1, .processed-answer h2, .processed-answer h3, 
+.processed-answer h4, .processed-answer h5, .processed-answer h6 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.processed-answer blockquote {
+    border-left: 4px solid #ccc;
+    padding-left: 1em;
+    margin-left: 0;
+    margin-bottom: 1em;
+}
