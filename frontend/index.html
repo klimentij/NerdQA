@@ -67,7 +67,8 @@
         let currentOpenTreeId = null;
         let allEvents = [];
 
-        const API_BASE_URL = 'http://localhost:8000';
+        const API_BASE_URL = window.location.protocol + '//' + window.location.hostname + ':8000';
+        console.log("Using API base URL:", API_BASE_URL);
 
         let socket;
         let isWebSocketConnected = false;
@@ -76,56 +77,121 @@
         let receivedIterations = 0;
 
         function connectWebSocket(sessionId) {
-            socket = new WebSocket(`ws://localhost:8000/ws/${sessionId}`);
+            console.log("Attempting to connect WebSocket for session:", sessionId);
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws/${sessionId}`;
+            console.log("WebSocket URL:", wsUrl);
             
-            socket.onopen = function() {
-                console.log("WebSocket connection established");
-                isWebSocketConnected = true;
-                reconnectAttempts = 0;
-            };
+            try {
+                socket = new WebSocket(wsUrl);
+                
+                // Set a timeout to fall back to polling if the connection doesn't establish quickly
+                const wsTimeout = setTimeout(() => {
+                    if (socket.readyState !== WebSocket.OPEN) {
+                        console.log("WebSocket connection timeout, falling back to polling");
+                        socket.close();
+                        startPolling(sessionId);
+                    }
+                }, 3000); // 3 second timeout
+                
+                socket.onopen = function() {
+                    console.log("WebSocket connection established for session:", sessionId);
+                    isWebSocketConnected = true;
+                    reconnectAttempts = 0;
+                    clearTimeout(wsTimeout); // Clear the timeout since connection succeeded
+                };
 
-            socket.onmessage = function(event) {
-                const message = JSON.parse(event.data);
-                handlePipelineUpdate(message);
-            };
+                socket.onmessage = function(event) {
+                    console.log("WebSocket message received:", event.data);
+                    try {
+                        const message = JSON.parse(event.data);
+                        console.log("Parsed WebSocket message:", message);
+                        handlePipelineUpdate(message);
+                    } catch (error) {
+                        console.error("Error parsing WebSocket message:", error);
+                    }
+                };
 
-            socket.onclose = function(event) {
-                console.log("WebSocket connection closed");
-                isWebSocketConnected = false;
-                if (reconnectAttempts < 5) {
-                    setTimeout(() => {
-                        reconnectAttempts++;
-                        console.log(`Attempting to reconnect (${reconnectAttempts}/5)...`);
-                        connectWebSocket(sessionId);
-                    }, 3000);
-                } else {
-                    console.log("Max reconnection attempts reached. Falling back to polling.");
-                    startPolling(sessionId);
-                }
-            };
+                socket.onclose = function(event) {
+                    console.log("WebSocket connection closed for session:", sessionId, "Code:", event.code, "Reason:", event.reason);
+                    isWebSocketConnected = false;
+                    if (reconnectAttempts < 5) {
+                        setTimeout(() => {
+                            reconnectAttempts++;
+                            console.log(`Attempting to reconnect (${reconnectAttempts}/5)...`);
+                            connectWebSocket(sessionId);
+                        }, 3000);
+                    } else {
+                        console.log("Max reconnection attempts reached. Falling back to polling.");
+                        startPolling(sessionId);
+                    }
+                };
 
-            socket.onerror = function(error) {
-                console.error("WebSocket error:", error);
-            };
+                socket.onerror = function(error) {
+                    console.error("WebSocket error for session:", sessionId, error);
+                };
+            } catch (error) {
+                console.error("Error creating WebSocket connection:", error);
+                startPolling(sessionId);
+            }
         }
 
         function startPolling(sessionId) {
-            const pollInterval = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/pipeline_status/${sessionId}`);
-                    if (!response.ok) {
-                        throw new Error("Polling failed");
-                    }
-                    const data = await response.json();
-                    handlePipelineUpdate(data);
-                    
-                    if (data.status === "completed") {
-                        clearInterval(pollInterval);
-                    }
-                } catch (error) {
-                    console.error("Polling error:", error);
+            console.log("Starting polling for session:", sessionId);
+            
+            // Immediately poll once to get the current status
+            pollForUpdates(sessionId);
+            
+            const pollInterval = setInterval(() => {
+                pollForUpdates(sessionId, () => {
+                    clearInterval(pollInterval);
+                });
+            }, 3000); // Poll every 3 seconds
+        }
+        
+        async function pollForUpdates(sessionId, completionCallback) {
+            try {
+                console.log("Polling for updates...");
+                const response = await fetch(`${API_BASE_URL}/pipeline_status/${sessionId}`);
+                if (!response.ok) {
+                    console.error("Polling failed with status:", response.status);
+                    throw new Error("Polling failed");
                 }
-            }, 5000); // Poll every 5 seconds
+                const data = await response.json();
+                console.log("Polling received data:", data);
+                
+                // Check if we have a final answer but the UI is still showing "Preparing..."
+                if (data.final_answer) {
+                    console.log("Found final answer in polling response");
+                    
+                    if (reportContent.innerHTML.includes("Preparing the initial report draft")) {
+                        console.log("UI is still in initial loading state, updating UI with final answer");
+                        const finalAnswer = {
+                            type: "answer",
+                            data: data.final_answer,
+                            iteration: data.total_iterations || 1,
+                            summary: data.summary || {},
+                            citation_trees: data.full_citation_tree || {}
+                        };
+                        handlePipelineUpdate(finalAnswer);
+                    }
+                }
+                
+                if (data.messages && Array.isArray(data.messages)) {
+                    console.log("Processing messages from polling response:", data.messages.length);
+                    // Process any messages we haven't seen yet
+                    data.messages.forEach(message => {
+                        handlePipelineUpdate(message);
+                    });
+                }
+                
+                if (data.status === "completed") {
+                    console.log("Pipeline completed, stopping polling");
+                    if (completionCallback) completionCallback();
+                }
+            } catch (error) {
+                console.error("Polling error:", error);
+            }
         }
 
         async function startPipeline(question, iterations, numQueries, startDate, endDate) {
@@ -154,6 +220,14 @@
                 expectedIterations = iterations;
                 receivedIterations = 0;
                 connectWebSocket(currentSessionId);
+                
+                // Add a fallback timer to check pipeline status if no WebSocket messages are received
+                setTimeout(() => {
+                    if (receivedIterations === 0) {
+                        console.log("No WebSocket messages received after 10 seconds, falling back to polling");
+                        startPolling(currentSessionId);
+                    }
+                }, 10000); // Check after 10 seconds
             } catch (error) {
                 console.error('Error starting pipeline:', error);
                 alert('Failed to start the research process. Please try again.');
@@ -161,6 +235,7 @@
         }
 
         function handlePipelineUpdate(data) {
+            console.log("Handling pipeline update:", data);
             if (data.type === "status" && data.data === "completed") {
                 // Handle completion
                 console.log("Pipeline completed");
@@ -178,18 +253,24 @@
         }
 
         function renderNewEvents(newEvents) {
+            console.log("Rendering new events:", newEvents);
             let newEventsHtml = '';
             newEvents.forEach(message => {
                 switch (message.type) {
                     case 'queries':
+                        console.log("Rendering queries:", message.data);
                         newEventsHtml += displayQueries(message.data, message.iteration);
                         break;
                     case 'statements':
+                        console.log("Rendering statements:", message.data);
                         newEventsHtml += displayStatements(message.data, message.iteration);
                         break;
                     case 'answer':
+                        console.log("Rendering answer:", message.data);
                         newEventsHtml += displayAnswer(message.data, message.iteration, message.summary, message.citation_trees);
                         break;
+                    default:
+                        console.log("Unknown message type:", message.type);
                 }
             });
             chatMessages.innerHTML += newEventsHtml;
@@ -234,6 +315,7 @@
 
         function displayAnswer(answer, iteration, summary, citationTrees) {
             console.log("Updating report content with answer:", answer);
+            console.log("Iteration:", iteration, "Total iterations:", parseInt(iterationsInput.value, 10));
             currentIteration = iteration;
             
             // Update allEvidence with new evidence
@@ -264,8 +346,10 @@
             }
 
             const processedAnswer = processAnswer(answer);
+            console.log("Processed answer:", processedAnswer);
 
             if (iteration === 1) {
+                // First iteration - set up the initial report structure
                 reportContent.innerHTML = `
                     <h2 class="report-title">${questionInput.value}</h2>
                     <div id="statusContainer">${statusHtml}</div>
@@ -276,11 +360,15 @@
                 const statusContainer = reportContent.querySelector('#statusContainer');
                 if (statusContainer) {
                     statusContainer.innerHTML = statusHtml;
+                } else {
+                    console.error("Status container not found in report content");
                 }
+                
                 const answerElement = reportContent.querySelector('.processed-answer');
                 if (answerElement) {
                     answerElement.innerHTML = processedAnswer;
                 } else {
+                    console.error("Answer element not found in report content");
                     reportContent.innerHTML += `<div class="processed-answer">${processedAnswer}</div>`;
                 }
             }
@@ -546,7 +634,57 @@
                     <i class="fas fa-sync fa-spin"></i>
                     Preparing the initial report draft...
                 </h3>
+                <p class="loading-info">
+                    The system is generating queries, searching for information, and creating a comprehensive report.
+                    This process may take a few minutes. If the report doesn't appear automatically, please use the refresh button below.
+                </p>
+                <button id="refreshButton" class="refresh-button">
+                    <i class="fas fa-sync"></i> Refresh Status
+                </button>
             `;
+            
+            // Add event listener for refresh button
+            const refreshButton = document.getElementById('refreshButton');
+            if (refreshButton) {
+                refreshButton.addEventListener('click', async () => {
+                    console.log("Manual refresh requested");
+                    refreshButton.disabled = true;
+                    refreshButton.innerHTML = '<i class="fas fa-sync fa-spin"></i> Refreshing...';
+                    
+                    if (currentSessionId) {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/pipeline_status/${currentSessionId}`);
+                            if (!response.ok) {
+                                throw new Error("Failed to fetch status");
+                            }
+                            const data = await response.json();
+                            console.log("Manual refresh received data:", data);
+                            
+                            // Check if we have a final answer
+                            if (data.final_answer) {
+                                console.log("Found final answer during manual refresh, updating UI");
+                                const finalAnswer = {
+                                    type: "answer",
+                                    data: data.final_answer,
+                                    iteration: data.total_iterations || 1,
+                                    summary: data.summary || {},
+                                    citation_trees: data.full_citation_tree || {}
+                                };
+                                handlePipelineUpdate(finalAnswer);
+                            } else {
+                                refreshButton.disabled = false;
+                                refreshButton.innerHTML = '<i class="fas fa-sync"></i> Refresh Status';
+                                alert("Report is still being generated. Please try again in a moment.");
+                            }
+                        } catch (error) {
+                            console.error("Manual refresh error:", error);
+                            refreshButton.disabled = false;
+                            refreshButton.innerHTML = '<i class="fas fa-sync"></i> Refresh Status';
+                            alert("Failed to refresh status. Please try again.");
+                        }
+                    }
+                });
+            }
         }
 
         async function fetchMissingCitationData(id) {
