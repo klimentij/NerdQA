@@ -15,6 +15,8 @@
 
 NerdQA is a deep research automation system that I implemented 6 months before OpenAI announced its Deep Research agent. This project was born from the belief that research automation is one of the most important applications of AI, with the potential to revolutionize knowledge work.
 
+📺 **[Watch the YouTube Demo](https://youtu.be/suZp-q8rwEQ)** to see NerdQA in action!
+
 ### 🛠️ Tech Stack
 
 - **Core**: Custom LLM framework for orchestration (no dependencies on LangChain, etc.)
@@ -32,6 +34,7 @@ Unlike common agent-based approaches, NerdQA uses an engineered LLM workflow in 
 - **Easier Troubleshooting**: Clear workflow steps make debugging simpler
 - **Cost Efficiency**: Optimized prompts and controlled token usage keep costs low
 - **Simplified Development**: Built as a budget-free pet project in personal time
+- **Model Flexibility**: Feasible to run on cheaper, smaller LLMs
 
 <p align="center">
   <img src="images/query-screenshot.png" alt="NerdQA Query Interface" width="80%">
