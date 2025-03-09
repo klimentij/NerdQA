@@ -184,3 +184,7 @@ backend/wandb
 
 # Export folder
 export/
+
+# New additions
+/backend/output/
+/output/
