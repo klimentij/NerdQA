@@ -15,10 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Add uv to PATH
-ENV PATH="/root/.cargo/bin:${PATH}"
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    echo 'export PATH="/root/.cargo/bin:$PATH"' >> ~/.bashrc && \
+    . ~/.bashrc
 
 # Copy the entire project into the container
 COPY . /app
@@ -29,7 +28,7 @@ RUN chmod +x /app/entrypoint.sh
 # Install Python dependencies
 RUN python -m venv /venv && \
     . /venv/bin/activate && \
-    uv pip install --prerelease=allow -r backend/config/requirements.txt
+    pip install -r backend/config/requirements.txt
 
 # Configure Redis
 COPY backend/config/redis.conf /etc/redis/redis.conf
